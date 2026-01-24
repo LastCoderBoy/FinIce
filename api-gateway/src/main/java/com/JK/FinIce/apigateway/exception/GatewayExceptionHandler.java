@@ -1,8 +1,11 @@
 package com.JK.FinIce.apigateway.exception;
 
 import com.JK.FinIce.commonlibrary.dto.ApiResponse;
+import com.JK.FinIce.commonlibrary.exception.InvalidTokenException;
+import com.JK.FinIce.commonlibrary.exception.ResourceNotFoundException;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.web.reactive.error.ErrorWebExceptionHandler;
 import org.springframework.core.annotation.Order;
@@ -24,9 +27,10 @@ import reactor.core.publisher.Mono;
 @Component
 @Order(-1)
 @Slf4j
+@RequiredArgsConstructor
 public class GatewayExceptionHandler implements ErrorWebExceptionHandler {
 
-    private final ObjectMapper objectMapper = new ObjectMapper();
+    private final ObjectMapper objectMapper;
 
     @Override
     public Mono<Void> handle(ServerWebExchange exchange, Throwable ex) {
@@ -55,29 +59,38 @@ public class GatewayExceptionHandler implements ErrorWebExceptionHandler {
             log.error("[API-GATEWAY] Client Error: {}", ex.getMessage(), ex);
             return (HttpStatus) ((ResponseStatusException) ex).getStatusCode();
         }
+        if (ex instanceof InvalidTokenException) {
+            return HttpStatus.UNAUTHORIZED;
+        }
+        if (ex instanceof ResourceNotFoundException) {
+            return HttpStatus.NOT_FOUND;
+        }
+        if (ex instanceof io.netty.handler.timeout.TimeoutException) {
+            return HttpStatus.GATEWAY_TIMEOUT;
+        }
+        if (ex instanceof java.net.ConnectException) {
+            return HttpStatus.SERVICE_UNAVAILABLE;
+        }
         // Default to 500 for unexpected errors
         log.error("[API-GATEWAY] Internal Server Error: {}", ex.getMessage(), ex);
         return HttpStatus.INTERNAL_SERVER_ERROR;
     }
 
     private String getUserFriendlyMessage(Throwable ex, HttpStatus status) {
-        if (status == HttpStatus.NOT_FOUND) {
-            return "The requested resource was not found";
-        }
-
-        if (status == HttpStatus.SERVICE_UNAVAILABLE) {
-            return "Service is temporarily unavailable. Please try again later";
-        }
-
-        if (status == HttpStatus.GATEWAY_TIMEOUT) {
-            return "Request timeout. Please try again";
-        }
-
-        if (status.is5xxServerError()) {
-            return "An error occurred while processing your request. Please try again later";
-        }
-
-        // For client errors, return the actual message
-        return ex.getMessage() != null ? ex.getMessage() : "An error occurred";
+        return switch (status) {
+            case NOT_FOUND -> "The requested resource was not found";
+            case UNAUTHORIZED -> "Authentication required. Please log in";
+            case FORBIDDEN -> "You don't have permission to access this resource";
+            case SERVICE_UNAVAILABLE -> "Service is temporarily unavailable. Please try again later";
+            case GATEWAY_TIMEOUT -> "Request timeout. Please try again";
+            case TOO_MANY_REQUESTS -> "Too many requests. Please slow down";
+            default -> {
+                if (status.is5xxServerError()) {
+                    yield "An internal error occurred. Please try again later";
+                }
+                // For 4xx errors, return the actual message
+                yield ex.getMessage() != null ? ex.getMessage() : "An error occurred";
+            }
+        };
     }
 }

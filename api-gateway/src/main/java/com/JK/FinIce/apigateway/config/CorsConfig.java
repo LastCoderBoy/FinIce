@@ -11,7 +11,7 @@ import java.util.Arrays;
 
 import static com.JK.FinIce.commonlibrary.constants.AppConstants.*;
 /**
- * It controls which external domains (origins) can make requests to our API from web browsers,
+ * Controls which external domains (origins) can make requests to our API from web browsers,
  * preventing unauthorized cross-origin requests while allowing legitimate ones.
  * */
 @Configuration
@@ -34,7 +34,7 @@ public class CorsConfig {
         corsConfiguration.setAllowedMethods(Arrays.asList(allowedMethods));
         corsConfiguration.setAllowCredentials(allowCredentials);
         corsConfiguration.setAllowedHeaders(Arrays.asList("*"));
-        corsConfiguration.setMaxAge(3600L);
+        corsConfiguration.setMaxAge(3600L); // caching for 1 hour
 
         corsConfiguration.setAllowedHeaders(
                 Arrays.asList(USER_ROLES_HEADER, AUTHORIZATION_HEADER, USER_ID_HEADER, "Content-Type"));

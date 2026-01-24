@@ -5,6 +5,8 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
 
+import java.io.Serializable;
+
 /**
  * Standard API response wrapper for all SIMS microservices
  * Provides a consistent response structure across all services
@@ -17,7 +19,7 @@ import lombok.Setter;
 @NoArgsConstructor
 @Getter
 @Setter
-public class ApiResponse<T> {
+public class ApiResponse<T> implements Serializable {
 
     private boolean success;
     private String message;
