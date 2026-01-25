@@ -22,7 +22,7 @@ public class AppConstants {
     // ========== Service Names ==========
     public static final String EUREKA_SERVER = "eureka-server";
     public static final String API_GATEWAY = "api-gateway";
-    public static final String AUTH_SERVICE = "authorization-service";
+    public static final String AUTH_SERVICE = "auth-service";
     public static final String ACCOUNT_SERVICE = "account-service";
     public static final String TRANSACTION_SERVICE = "transaction-service";
     public static final String CARD_SERVICE = "card-service";
