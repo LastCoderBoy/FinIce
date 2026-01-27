@@ -2,7 +2,7 @@ package com.JK.FinIce.commonlibrary.constants;
 
 import java.util.List;
 
-public class AppConstants {
+public final class AppConstants {
 
     // Private constructor to prevent instantiation
     private AppConstants() {

@@ -28,7 +28,6 @@ import static com.JK.FinIce.commonlibrary.constants.AppConstants.*;
 @Slf4j
 public class JwtAuthenticationFilter extends AbstractGatewayFilterFactory<JwtAuthenticationFilter.Config> {
 
-    // TODO: Add the auth-service dependency
     private final PathMatcher pathMatcher;
     private final JwtProvider jwtProvider;
     @Autowired
@@ -66,7 +65,7 @@ public class JwtAuthenticationFilter extends AbstractGatewayFilterFactory<JwtAut
                     return onError(exchange, config.getUnauthorizedMessage(), HttpStatus.UNAUTHORIZED);
                 }
 
-                // TODO: Deep validation by calling the AUTHORIZATION-SERVICE for blacklisted tokens
+                // TODO: Deep validation by calling the Redis for blacklisted tokens
                 // will implement later
 
                 // Extract username and role from JWT token and set it in the request context
