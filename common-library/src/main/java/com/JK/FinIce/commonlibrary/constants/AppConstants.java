@@ -18,6 +18,7 @@ public final class AppConstants {
     public static final String IP_ADDRESS_HEADER = "X-Forwarded-For";
     public static final String USER_ID_HEADER = "X-User-ID";
     public static final String USER_ROLES_HEADER = "X-User-Roles";
+    public static final String USERNAME_HEADER = "X-Username";
 
     // ========== Service Names ==========
     public static final String EUREKA_SERVER = "eureka-server";
@@ -45,9 +46,19 @@ public final class AppConstants {
     public static final List<String> PUBLIC_PATHS = List.of(
             AUTH_PATH + "/create",
             AUTH_PATH + "/login",
-            AUTH_PATH + "/refresh",
+            AUTH_PATH + "/token/refresh",
+            AUTH_PATH + "/verify-email/**",
+            AUTH_PATH + "/forgot-password",
+            AUTH_PATH + "/reset-password",
+
+            // Actuator endpoints
             "/actuator/health",
-            "/actuator/info"
+            "/actuator/info",
+
+            // Swagger/API docs
+            "/swagger-ui/**",
+            "/v3/api-docs/**",
+            "/swagger-resources/**"
     );
 
 
@@ -56,6 +67,13 @@ public final class AppConstants {
     public static final int BEARER_PREFIX_LENGTH = 7;
     public static final long ACCESS_TOKEN_DURATION_MS = 15 * 60 * 1000; // 15 minutes
     public static final long REFRESH_TOKEN_DURATION_MS = 7 * 24 * 60 * 60 * 1000; // 7 days
+    public static final String JWT_CLAIM_USER_ID = "userId";
+    public static final String JWT_CLAIM_ROLES = "roles";
+    public static final String JWT_CLAIM_EMAIL = "email";
+    public static final String JWT_CLAIM_TOKEN_TYPE = "tokenType";
+    public static final String TOKEN_TYPE_ACCESS = "ACCESS";
+    public static final String TOKEN_TYPE_REFRESH = "REFRESH";
+
 
     // ========== Cache Keys ==========
     public static final String CACHE_USER_PREFIX = "user:";
