@@ -1,19 +1,17 @@
 package com.JK.FinIce.authservice.entity;
 
-import com.JK.FinIce.authservice.enums.AccountStatus;
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import lombok.Builder;
 import lombok.Getter;
 import lombok.RequiredArgsConstructor;
-import lombok.Setter;
 import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.userdetails.UserDetails;
 
-import java.time.LocalDateTime;
 import java.util.Arrays;
 import java.util.Collection;
-import java.util.Collections;
 import java.util.List;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 /**
@@ -31,17 +29,30 @@ public class UserPrincipal implements UserDetails {
     private final Long id;
     private final String username;
     private final String email;
-    private final String password;  // Only for authentication
-    private final String firstName;
-    private final String lastName;
-    private final AccountStatus accountStatus;
-    private final Boolean accountLocked;
-    private final LocalDateTime accountLockedUntil;
-    private final Boolean emailVerified;
-    private final Collection<? extends GrantedAuthority> authorities;
+
+    @JsonIgnore
+    private final Collection<? extends GrantedAuthority> authorities;  // Authorization
+
+    /**
+     * Factory method to create UserPrincipal from JWT claims
+     */
+    public static UserPrincipal fromJwtClaims(Long userId, String username, String email,
+                                              List<String> roles) {
+        List<GrantedAuthority> authorities = roles.stream()
+                .map(SimpleGrantedAuthority::new)
+                .collect(Collectors.toList());
+
+        return UserPrincipal.builder()
+                .id(userId)
+                .username(username)
+                .email(email)
+                .authorities(authorities)
+                .build();
+    }
 
     /**
      * Factory method to create UserPrincipal from User entity
+     * FOR LOGIN ONLY (when we have the User object already)
      */
     public static UserPrincipal create(User user) {
         List<GrantedAuthority> authorities = user.getRoles().stream()
@@ -55,13 +66,6 @@ public class UserPrincipal implements UserDetails {
                 .id(user.getId())
                 .username(user.getUsername())
                 .email(user.getEmail())
-                .password(user.getPassword())
-                .firstName(user.getFirstName())
-                .lastName(user.getLastName())
-                .accountStatus(user.getAccountStatus())
-                .accountLocked(user.getAccountLocked())
-                .accountLockedUntil(user.getAccountLockedUntil())
-                .emailVerified(user.getEmailVerified())
                 .authorities(authorities)
                 .build();
     }
@@ -73,7 +77,7 @@ public class UserPrincipal implements UserDetails {
 
     @Override
     public String getPassword() {
-        return password;
+        return null; // not stored in JWT
     }
 
     @Override
@@ -83,33 +87,25 @@ public class UserPrincipal implements UserDetails {
 
     @Override
     public boolean isAccountNonExpired() {
-        return UserDetails.super.isAccountNonExpired();
+        return true;  // Checked at login, JWT expiration handles this
     }
 
     @Override
     public boolean isAccountNonLocked() {
-        if (!accountLocked) {
-            return true;
-        }
-
-        // Check if lock has expired
-        if (accountLockedUntil != null && LocalDateTime.now().isAfter(accountLockedUntil)) {
-            return true;  // Lock expired
-        }
-
-        return false;  // Still locked
+       return true; // Checked at login, refresh if needed
     }
 
     @Override
     public boolean isCredentialsNonExpired() {
-        return UserDetails.super.isCredentialsNonExpired();
+        return true; // JWT expiration handles
     }
 
     @Override
     public boolean isEnabled() {
-        return accountStatus == AccountStatus.ACTIVE;
+        return true;  // Checked at login
     }
 
+    // ==================== Helper Methods ====================
     public boolean hasRole(String roleName) {
         String roleToCheck = roleName.startsWith("ROLE_") ? roleName : "ROLE_" + roleName;
         return authorities.stream()
@@ -119,5 +115,11 @@ public class UserPrincipal implements UserDetails {
     public boolean hasAnyRole(String... roleNames) {
         return Arrays.stream(roleNames)
                 .anyMatch(this::hasRole);
+    }
+
+    public Set<String> getRoleNames() {
+        return authorities.stream()
+                .map(GrantedAuthority::getAuthority)
+                .collect(Collectors.toSet());
     }
 }
