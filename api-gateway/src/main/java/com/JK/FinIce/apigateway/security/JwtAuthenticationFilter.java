@@ -1,5 +1,6 @@
 package com.JK.FinIce.apigateway.security;
 
+import com.JK.FinIce.apigateway.redis.RedisService;
 import com.JK.FinIce.commonlibrary.exception.InvalidTokenException;
 import com.JK.FinIce.commonlibrary.utils.TokenUtils;
 import lombok.Getter;
@@ -30,10 +31,12 @@ public class JwtAuthenticationFilter extends AbstractGatewayFilterFactory<JwtAut
 
     private final PathMatcher pathMatcher;
     private final JwtProvider jwtProvider;
+    private final RedisService redisService;
     @Autowired
-    public JwtAuthenticationFilter(JwtProvider jwtProvider) {
+    public JwtAuthenticationFilter(JwtProvider jwtProvider, RedisService redisService) {
         super(Config.class);
         this.jwtProvider = jwtProvider;
+        this.redisService = redisService;
         this.pathMatcher = new AntPathMatcher();
     }
 
@@ -45,47 +48,75 @@ public class JwtAuthenticationFilter extends AbstractGatewayFilterFactory<JwtAut
 
             log.info("[JWT-AUTH-FILTER] Processing request: {} {}", request.getMethod(), path);
 
-            if(isPublicPath(path, config)){
-                log.info("[JWT-AUTH-FILTER] Request is public, skipping authentication");
+            if (isPublicPath(path, config)) {
+                log.info("[JWT-AUTH-FILTER] Public path detected, skipping authentication");
                 return chain.filter(exchange);
             }
 
-            // Extract the JWT token from the Authorization header and validate it
-            if(!request.getHeaders().containsKey(AUTHORIZATION_HEADER)){
-                log.warn("[JWT-AUTH-FILTER] No Authorization header found in request");
-                return onError(exchange, "Missing Authorization Header", HttpStatus.UNAUTHORIZED);
+            if (!config.isEnabled()) {
+                log.debug("[JWT-AUTH-FILTER] Filter disabled for this route");
+                return chain.filter(exchange);
             }
 
-            // TODO: Consider validating the roles
+            if (!request.getHeaders().containsKey(AUTHORIZATION_HEADER)) {
+                log.warn("[JWT-AUTH-FILTER] Missing Authorization header for: {}", path);
+                return onError(exchange, "Missing Authorization header", HttpStatus.UNAUTHORIZED);
+            }
+
             String authHeader = request.getHeaders().getFirst(AUTHORIZATION_HEADER);
-            try{
-                String token = TokenUtils.validateAndExtractToken(authHeader); // throws InvalidTokenException if token is invalid
-                if(!jwtProvider.validateToken(token)){
-                    log.warn("[JWT-AUTH-FILTER] Invalid JWT token");
+
+            try {
+                String token = TokenUtils.validateAndExtractToken(authHeader);
+
+                if (!jwtProvider.validateToken(token)) {
+                    log.warn("[JWT-AUTH-FILTER] Invalid JWT token for path: {}", path);
                     return onError(exchange, config.getUnauthorizedMessage(), HttpStatus.UNAUTHORIZED);
                 }
 
-                // TODO: Deep validation by calling the Redis for blacklisted tokens
-                // will implement later
+                // Check if token is blacklisted
+                return redisService.isTokenBlacklisted(token)
+                        .flatMap(isBlacklisted -> {
+                            if (isBlacklisted) {
+                                log.warn("[JWT-AUTH-FILTER] Blacklisted token attempted for: {}", path);
+                                return onError(exchange, "Token has been revoked", HttpStatus.UNAUTHORIZED);
+                            }
 
-                // Extract username and role from JWT token and set it in the request context
-                String username = jwtProvider.getUsernameFromJWT(token);
-                List<String> roles = jwtProvider.getRolesFromToken(token);
-                log.info("[JWT-AUTH-FILTER] User {} authenticated successfully", username);
+                            // Extract user details
+                            String userId = String.valueOf(jwtProvider.getUserIdFromToken(token));
+                            String username = jwtProvider.getUsernameFromJWT(token);
+                            List<String> userRoles = jwtProvider.getRolesFromToken(token);
 
-                ServerHttpRequest modifiedRequest = request.mutate()
-                        .header(USER_ID_HEADER, username)
-                        .header(USER_ROLES_HEADER, String.join(",", roles))
-                        .build();
+                            // Check required roles
+                            if (!config.getRequiredRoles().isEmpty()) {
+                                boolean hasRequiredRole = userRoles.stream()
+                                        .anyMatch(role -> config.getRequiredRoles().contains(role));
 
-                // Return the request to the responsible backend service
-                return chain.filter(exchange.mutate().request(modifiedRequest).build());
+                                if (!hasRequiredRole) {
+                                    log.warn("[JWT-AUTH-FILTER] User {} lacks required roles for {}",
+                                            username, path);
+                                    return onError(exchange, config.getForbiddenMessage(), HttpStatus.FORBIDDEN);
+                                }
+                            }
 
-            } catch (InvalidTokenException e){
-                throw e;
-            } catch (Exception e){
-                log.error("[JWT-AUTH-FILTER] Unexpected error occurred while validating JWT token: {}", e.getMessage());
-                return onError(exchange, "Internal Server Error", HttpStatus.INTERNAL_SERVER_ERROR);
+                            log.info("[JWT-AUTH-FILTER] User {} (ID: {}) authenticated successfully",
+                                    username, userId);
+
+                            // Add user context headers
+                            ServerHttpRequest modifiedRequest = request.mutate()
+                                    .header(USER_ID_HEADER, userId != null ? userId : "")
+                                    .header(USERNAME_HEADER, username)
+                                    .header(USER_ROLES_HEADER, String.join(",", userRoles))
+                                    .build();
+
+                            return chain.filter(exchange.mutate().request(modifiedRequest).build());
+                        });
+
+            } catch (InvalidTokenException e) {
+                log.warn("[JWT-AUTH-FILTER] Invalid token: {}", e.getMessage());
+                return onError(exchange, e.getMessage(), HttpStatus.UNAUTHORIZED);
+            } catch (Exception e) {
+                log.error("[JWT-AUTH-FILTER] Unexpected error: {}", e.getMessage(), e);
+                return onError(exchange, "Internal server error", HttpStatus.INTERNAL_SERVER_ERROR);
             }
         };
     }

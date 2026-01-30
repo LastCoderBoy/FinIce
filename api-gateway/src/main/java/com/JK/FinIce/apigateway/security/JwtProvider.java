@@ -15,7 +15,7 @@ import javax.crypto.SecretKey;
 import java.util.Date;
 import java.util.List;
 
-import static com.JK.FinIce.commonlibrary.constants.AppConstants.ACCESS_TOKEN_DURATION_MS;
+import static com.JK.FinIce.commonlibrary.constants.AppConstants.*;
 
 @Component
 @Slf4j
@@ -89,7 +89,8 @@ public class JwtProvider {
         try {
             Claims claims = Jwts.parser()
                     .verifyWith(secretKey)
-                    .build().parseSignedClaims(token)
+                    .build()
+                    .parseSignedClaims(token)
                     .getPayload();
             return claims.getSubject();
         } catch (JwtException e) {
@@ -101,16 +102,32 @@ public class JwtProvider {
         }
     }
 
+    public Long getUserIdFromToken(String token) {
+        Claims claims = extractAllClaims(token);
+        Object userIdKey = claims.get(JWT_CLAIM_USER_ID);
+
+        if (userIdKey instanceof Integer) {
+            return ((Integer) userIdKey).longValue();
+        } else if (userIdKey instanceof Long) {
+            return (Long) userIdKey;
+        } else if (userIdKey != null) {
+            return Long.parseLong(userIdKey.toString());
+        }
+
+        return null;
+    }
+
     @SuppressWarnings("unchecked")
     public List<String> getRolesFromToken(String token) {
         try {
-            Claims claims = Jwts.parser()
-                    .verifyWith(secretKey)
-                    .build()
-                    .parseSignedClaims(token)
-                    .getPayload();
+            Claims claims = extractAllClaims(token);
+            Object roles = claims.get(JWT_CLAIM_ROLES);
 
-            return claims.get("roles", List.class);
+            if (roles instanceof List) {
+                return (List<String>) roles;
+            }
+
+            return List.of();
         } catch (Exception e) {
             log.error("[JWT-PROVIDER] Failed to extract roles from token: {}", e.getMessage());
             return List.of(); // Return empty list if roles not found
@@ -145,6 +162,21 @@ public class JwtProvider {
             return expiration.before(new Date());
         } catch (Exception e) {
             return true; // Consider invalid tokens as expired
+        }
+    }
+
+    // ==================== HELPER METHODS ====================
+
+    private Claims extractAllClaims(String token) {
+        try {
+            return Jwts.parser()
+                    .verifyWith(secretKey)
+                    .build()
+                    .parseSignedClaims(token)
+                    .getPayload();
+        } catch (Exception e) {
+            log.error("[AUTH-JWT-PROVIDER] Failed to extract claims: {}", e.getMessage());
+            throw new RuntimeException("Invalid JWT token", e);
         }
     }
 }

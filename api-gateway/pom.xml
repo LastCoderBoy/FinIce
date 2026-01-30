@@ -56,10 +56,16 @@
             <artifactId>jjwt-jackson</artifactId>
         </dependency>
 
-        <!-- Redis for Rate Limiting -->
+        <!-- Redis (Reactive for Gateway) -->
         <dependency>
             <groupId>org.springframework.boot</groupId>
-            <artifactId>spring-boot-starter-data-redis</artifactId>
+            <artifactId>spring-boot-starter-data-redis-reactive</artifactId>
+        </dependency>
+
+        <!-- Lettuce (Async Redis client) -->
+        <dependency>
+            <groupId>io.lettuce</groupId>
+            <artifactId>lettuce-core</artifactId>
         </dependency>
 
         <!-- Circuit Breaker (Resilience4j) -->
