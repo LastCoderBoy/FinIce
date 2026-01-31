@@ -1,4 +1,4 @@
-package com.JK.FinIce.authservice.service;
+package com.JK.FinIce.authservice.config.security;
 
 import com.JK.FinIce.authservice.entity.User;
 import com.JK.FinIce.authservice.entity.UserPrincipal;

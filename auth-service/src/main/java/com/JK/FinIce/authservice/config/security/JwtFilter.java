@@ -11,8 +11,6 @@ import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
-import org.springframework.security.core.GrantedAuthority;
-import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.web.authentication.WebAuthenticationDetailsSource;
 import org.springframework.stereotype.Component;
@@ -22,7 +20,6 @@ import org.springframework.web.filter.OncePerRequestFilter;
 
 import java.io.IOException;
 import java.util.List;
-import java.util.stream.Collectors;
 
 import static com.JK.FinIce.commonlibrary.constants.AppConstants.AUTHORIZATION_HEADER;
 import static com.JK.FinIce.commonlibrary.constants.AppConstants.PUBLIC_PATHS;
@@ -56,7 +53,6 @@ public class JwtFilter extends OncePerRequestFilter {
                 throw new InvalidTokenException("Invalid or expired token");
             }
 
-            // TODO: check if token is blacklisted or not (implement the method by checking Redis)
             if(redisService.isTokenBlacklisted(token)){
                 log.warn("[JWT-FILTER] Token is blacklisted");
                 throw new InvalidTokenException("Token is blacklisted");

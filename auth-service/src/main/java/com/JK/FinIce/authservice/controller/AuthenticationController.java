@@ -3,8 +3,8 @@ package com.JK.FinIce.authservice.controller;
 
 import com.JK.FinIce.authservice.dto.*;
 import com.JK.FinIce.authservice.entity.UserPrincipal;
+import com.JK.FinIce.authservice.service.AuthenticationService;
 import com.JK.FinIce.commonlibrary.dto.ApiResponse;
-import com.JK.FinIce.commonlibrary.utils.TokenUtils;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import jakarta.validation.Valid;
@@ -14,8 +14,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 
-import static com.JK.FinIce.commonlibrary.constants.AppConstants.AUTHORIZATION_HEADER;
-import static com.JK.FinIce.commonlibrary.constants.AppConstants.AUTH_PATH;
+import static com.JK.FinIce.commonlibrary.constants.AppConstants.*;
 
 /**
  * Authentication Controller
@@ -32,17 +31,17 @@ public class AuthenticationController {
     private final AuthenticationService authService;
 
     @PostMapping("/register")
-    public ResponseEntity<ApiResponse<UserResponse>> register(@Valid @RequestBody RegisterRequest registerRequest,
+    public ResponseEntity<ApiResponse<AuthResponse>> register(@Valid @RequestBody RegisterRequest registerRequest,
                                                               HttpServletResponse response,
                                                               HttpServletRequest request) {
         // Base validation is done via @Valid annotation
         // processing the request to the service layer
         log.info("[AUTH-CONTROLLER] Registering user: {}", registerRequest.getUsername());
 
-        UserResponse userResponse = authService.register(registerRequest, response, request);
+        AuthResponse authResponse = authService.register(registerRequest, response, request);
 
         return ResponseEntity.ok(
-                ApiResponse.success("User registered successfully", userResponse)
+                ApiResponse.success("User registered successfully", authResponse)
         );
     }
 
@@ -85,7 +84,7 @@ public class AuthenticationController {
                                                             HttpServletResponse response){
         log.info("[AUTH-CONTROLLER] Updating user details...");
 
-        UserResponse userResponse = authService.update(updateUserRequest, principal, request, response);
+        UserResponse userResponse = authService.updateUserProfile(updateUserRequest, principal, request, response);
 
         return ResponseEntity.ok(ApiResponse.success("User updated successfully", userResponse));
     }

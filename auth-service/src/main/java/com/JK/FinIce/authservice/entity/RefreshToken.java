@@ -5,6 +5,7 @@ import jakarta.persistence.*;
 import lombok.*;
 import org.hibernate.annotations.CreationTimestamp;
 
+import java.time.Instant;
 import java.time.LocalDateTime;
 
 @Entity
@@ -38,7 +39,7 @@ public class RefreshToken {
     private User user;
 
     @Column(nullable = false)
-    private LocalDateTime expiresAt;
+    private Instant expiresAt; // TODO: fix the DB
 
     @Column(nullable = false)
     private Boolean revoked = false;
@@ -65,7 +66,7 @@ public class RefreshToken {
     }
 
     public boolean isExpired() {
-        return LocalDateTime.now().isAfter(expiresAt);
+        return Instant.now().isAfter(expiresAt);
     }
 
     public void revoke() {

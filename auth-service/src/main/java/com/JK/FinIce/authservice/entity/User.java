@@ -63,10 +63,10 @@ public class User {
     private AccountStatus accountStatus = AccountStatus.PENDING_VERIFICATION;
 
     @Column(nullable = false)
-    private Boolean accountLocked = false;
+    private Boolean accountLocked = false; // the field only checks whether the User is able to login or not
 
     @Column
-    private LocalDateTime accountLockedUntil;
+    private LocalDateTime accountLockedUntil; // used when many password attempts are made
 
     @Column(nullable = false)
     private Integer failedLoginAttempts = 0;
@@ -107,6 +107,11 @@ public class User {
     public void removeRole(Role role) {
         this.roles.remove(role);
         role.getUsers().remove(this);
+    }
+
+    public void addRefreshToken(RefreshToken refreshToken) {
+        this.refreshTokens.add(refreshToken);
+        refreshToken.setUser(this);
     }
 
     public boolean isAccountNonLocked(){

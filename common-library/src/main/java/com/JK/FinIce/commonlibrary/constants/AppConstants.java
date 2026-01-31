@@ -73,6 +73,7 @@ public final class AppConstants {
     public static final String JWT_CLAIM_TOKEN_TYPE = "tokenType";
     public static final String TOKEN_TYPE_ACCESS = "ACCESS";
     public static final String TOKEN_TYPE_REFRESH = "REFRESH";
+    public static final String REFRESH_TOKEN_COOKIE_NAME = "refreshToken";
 
 
     // ========== Cache Keys ==========

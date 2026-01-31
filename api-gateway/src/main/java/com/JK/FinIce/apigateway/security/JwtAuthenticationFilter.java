@@ -53,11 +53,6 @@ public class JwtAuthenticationFilter extends AbstractGatewayFilterFactory<JwtAut
                 return chain.filter(exchange);
             }
 
-            if (!config.isEnabled()) {
-                log.debug("[JWT-AUTH-FILTER] Filter disabled for this route");
-                return chain.filter(exchange);
-            }
-
             if (!request.getHeaders().containsKey(AUTHORIZATION_HEADER)) {
                 log.warn("[JWT-AUTH-FILTER] Missing Authorization header for: {}", path);
                 return onError(exchange, "Missing Authorization header", HttpStatus.UNAUTHORIZED);
@@ -73,7 +68,7 @@ public class JwtAuthenticationFilter extends AbstractGatewayFilterFactory<JwtAut
                     return onError(exchange, config.getUnauthorizedMessage(), HttpStatus.UNAUTHORIZED);
                 }
 
-                // Check if token is blacklisted
+                // Check if token is blacklisted in Redis Cache
                 return redisService.isTokenBlacklisted(token)
                         .flatMap(isBlacklisted -> {
                             if (isBlacklisted) {

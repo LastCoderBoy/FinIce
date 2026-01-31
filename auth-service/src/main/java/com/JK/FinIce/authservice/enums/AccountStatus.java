@@ -1,5 +1,8 @@
 package com.JK.FinIce.authservice.enums;
 
+import lombok.Getter;
+
+@Getter
 public enum AccountStatus {
     ACTIVE ("Normal active account"),
     INACTIVE ("Temporarily inactive"),
