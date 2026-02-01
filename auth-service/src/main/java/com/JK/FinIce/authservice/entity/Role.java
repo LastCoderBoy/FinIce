@@ -43,8 +43,17 @@ public class Role {
     private LocalDateTime createdAt;
 
     // Constructor for easy role creation
-    public Role(RoleName roleName) {
-        this.name = roleName;
-        this.description = roleName.getDescription();
+    public Role(RoleName name) {
+        this.name = name;
+        this.users = new HashSet<>();
+        this.description = name.getDescription();
     }
+
+    public Role(RoleName name, String description) {
+        this.name = name;
+        this.description = description;
+        this.users = new HashSet<>();
+    }
+
+
 }

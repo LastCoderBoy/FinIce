@@ -45,8 +45,6 @@ public class AuthenticationController {
         );
     }
 
-    // Better to use the AuthenticationPrincipal annotation rather than
-    // validating the Access Token in the authorization header
     @GetMapping("/profile")
     public ResponseEntity<ApiResponse<UserResponse>> getProfile(@AuthenticationPrincipal UserPrincipal principal){
         log.info("[AUTH-CONTROLLER] Getting user details...");

@@ -115,14 +115,6 @@
 				<version>${springdoc.version}</version>
 			</dependency>
 
-			<!-- Redis -->
-			<dependency>
-				<groupId>org.springframework.boot</groupId>
-				<artifactId>spring-boot-starter-data-redis</artifactId>
-				<version>4.0.2</version>
-				<scope>compile</scope>
-			</dependency>
-
 			<!-- Common Library (Internal) -->
 			<dependency>
 				<groupId>com.JK</groupId>

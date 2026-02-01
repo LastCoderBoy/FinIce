@@ -53,9 +53,6 @@ public class RefreshToken {
     @Column(length = 255)
     private String userAgent;
 
-    @Column(length = 100)
-    private String deviceId; // For tracking devices
-
     @CreationTimestamp
     @Column(nullable = false, updatable = false)
     private LocalDateTime createdAt;

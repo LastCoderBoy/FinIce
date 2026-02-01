@@ -4,6 +4,7 @@ import com.JK.FinIce.authservice.enums.AccountStatus;
 import jakarta.persistence.*;
 import lombok.*;
 import org.hibernate.annotations.CreationTimestamp;
+import org.springframework.security.core.userdetails.UserDetails;
 
 import java.time.LocalDateTime;
 import java.util.HashSet;
@@ -100,18 +101,42 @@ public class User {
     // ============= HELPER METHODS =============
 
     public void addRole(Role role) {
+        if (role == null) {
+            return;
+        }
         this.roles.add(role);
-        role.getUsers().add(this);
+
+        // Safe bidirectional sync
+        if (role.getUsers() != null) {
+            role.getUsers().add(this);
+        }
     }
 
     public void removeRole(Role role) {
+        if (role == null) {
+            return;
+        }
         this.roles.remove(role);
-        role.getUsers().remove(this);
+
+        if (role.getUsers() != null) {
+            role.getUsers().remove(this);
+        }
     }
 
     public void addRefreshToken(RefreshToken refreshToken) {
+        if (refreshToken == null) {
+            return;
+        }
         this.refreshTokens.add(refreshToken);
-        refreshToken.setUser(this);
+        refreshToken.setUser(this);  // Set parent reference
+    }
+
+    public void removeRefreshToken(RefreshToken refreshToken) {
+        if (refreshToken == null) {
+            return;
+        }
+        this.refreshTokens.remove(refreshToken);
+        refreshToken.setUser(null);
     }
 
     public boolean isAccountNonLocked(){
@@ -121,7 +146,6 @@ public class User {
 
         // Check if lock has expired
         if (accountLockedUntil != null && LocalDateTime.now().isAfter(accountLockedUntil)) {
-            resetFailedLoginAttempts();
             return true;
         }
 
@@ -146,7 +170,7 @@ public class User {
 
 
     public String getFullName(){
-        if(firstName != null & lastName != null){
+        if(firstName != null && lastName != null){
             return firstName + " " + lastName;
         }
         return username;

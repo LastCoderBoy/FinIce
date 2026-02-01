@@ -1,6 +1,5 @@
 package com.JK.FinIce.authservice.config.security;
 
-import com.JK.FinIce.authservice.service.CustomUserDetailsService;
 import com.JK.FinIce.commonlibrary.dto.ApiResponse;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.servlet.http.HttpServletResponse;

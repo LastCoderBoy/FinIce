@@ -44,7 +44,7 @@ public final class AppConstants {
     public static final String REPORT_PATH = BASE_PATH + "/reports";
 
     public static final List<String> PUBLIC_PATHS = List.of(
-            AUTH_PATH + "/create",
+            AUTH_PATH + "/register",
             AUTH_PATH + "/login",
             AUTH_PATH + "/token/refresh",
             AUTH_PATH + "/verify-email/**",

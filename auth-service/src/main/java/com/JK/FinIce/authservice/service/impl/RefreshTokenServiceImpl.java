@@ -2,6 +2,7 @@ package com.JK.FinIce.authservice.service.impl;
 
 import com.JK.FinIce.authservice.entity.RefreshToken;
 import com.JK.FinIce.authservice.entity.User;
+import com.JK.FinIce.authservice.exception.JwtAuthenticationException;
 import com.JK.FinIce.authservice.repository.RefreshTokenRepository;
 import com.JK.FinIce.authservice.service.RefreshTokenService;
 import com.JK.FinIce.commonlibrary.exception.ResourceNotFoundException;
@@ -26,22 +27,27 @@ public class RefreshTokenServiceImpl implements RefreshTokenService {
     @Transactional
     public RefreshToken createRefreshToken(User user, String clientIP, String userAgent) {
         // Generate a secure random token
-        String tokenString = TokenUtils.generateSecureToken();
+        try {
+            String tokenString = TokenUtils.generateSecureToken();
 
-        RefreshToken refreshToken = RefreshToken.builder()
-                .token(tokenString)
-                .user(user)
-                .expiresAt(Instant.now().plusMillis(REFRESH_TOKEN_DURATION_MS))
-                .revoked(false)
-                .ipAddress(clientIP)
-                .userAgent(userAgent)
-                .build();
+            RefreshToken refreshToken = RefreshToken.builder()
+                    .token(tokenString)
+                    .user(user)
+                    .expiresAt(Instant.now().plusMillis(REFRESH_TOKEN_DURATION_MS))
+                    .revoked(false)
+                    .ipAddress(clientIP)
+                    .userAgent(userAgent)
+                    .build();
 
-        refreshToken = refreshTokenRepository.save(refreshToken);
-        log.info("[REFRESH-TOKEN-SERVICE] Created refresh token for user: {} (ID: {})",
-                user.getUsername(), user.getId());
+            refreshToken = refreshTokenRepository.save(refreshToken);
+            log.info("[REFRESH-TOKEN-SERVICE] Created refresh token for user: {} (ID: {})",
+                    user.getUsername(), user.getId());
 
-        return refreshToken;
+            return refreshToken;
+        } catch (Exception e) {
+            log.error("[REFRESH-TOKEN-SERVICE] Failed to create refresh token: {}", e.getMessage());
+            throw new JwtAuthenticationException("Failed to create internal token");
+        }
     }
 
     @Override

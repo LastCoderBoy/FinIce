@@ -1,5 +1,6 @@
 package com.JK.FinIce.authservice.service.impl;
 
+import com.JK.FinIce.authservice.config.AuthCookiesManager;
 import com.JK.FinIce.authservice.config.redis.RedisService;
 import com.JK.FinIce.authservice.config.security.JwtProvider;
 import com.JK.FinIce.authservice.dto.*;
@@ -8,6 +9,7 @@ import com.JK.FinIce.authservice.entity.Role;
 import com.JK.FinIce.authservice.entity.User;
 import com.JK.FinIce.authservice.entity.UserPrincipal;
 import com.JK.FinIce.authservice.enums.AccountStatus;
+import com.JK.FinIce.authservice.exception.AccountLockedException;
 import com.JK.FinIce.authservice.exception.DuplicateResourceFoundException;
 import com.JK.FinIce.authservice.queryService.RoleQueryService;
 import com.JK.FinIce.authservice.repository.UserRepository;
@@ -16,32 +18,43 @@ import com.JK.FinIce.authservice.service.RefreshTokenService;
 import com.JK.FinIce.authservice.utils.HeaderExtractor;
 import com.JK.FinIce.commonlibrary.exception.InternalServerException;
 import com.JK.FinIce.commonlibrary.exception.InvalidTokenException;
-import jakarta.servlet.http.Cookie;
+import com.JK.FinIce.commonlibrary.exception.ResourceNotFoundException;
+import com.JK.FinIce.commonlibrary.utils.TokenUtils;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.security.authentication.AuthenticationManager;
+import org.springframework.security.authentication.BadCredentialsException;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.AuthenticationException;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
+import java.util.Date;
 import java.util.List;
+import java.util.Optional;
 
 import static com.JK.FinIce.authservice.mapper.UserMapper.mapToAuthResponse;
-import static com.JK.FinIce.commonlibrary.constants.AppConstants.*;
+import static com.JK.FinIce.authservice.mapper.UserMapper.mapToUserResponse;
+import static com.JK.FinIce.commonlibrary.constants.AppConstants.AUTHORIZATION_HEADER;
 
 @Service
 @Slf4j
 @RequiredArgsConstructor
 public class AuthenticationServiceImpl implements AuthenticationService {
 
+    private final AuthCookiesManager cookiesManager;
     private final UserRepository userRepository;
     private final JwtProvider jwtProvider;
     private final RedisService redisService;
     private final RoleQueryService roleQueryService;
     private final PasswordEncoder passwordEncoder;
     private final RefreshTokenService refreshTokenService;
+    private final AuthenticationManager authenticationManager;
 
     @Transactional(rollbackFor = Exception.class)  // Rollback on ANY exception
     @Override
@@ -80,12 +93,10 @@ public class AuthenticationServiceImpl implements AuthenticationService {
             );
 
             // Set the Refresh token cookie
-            setRefreshTokenCookie(response, refreshToken.getToken());
+            cookiesManager.setRefreshTokenCookie(response, refreshToken.getToken());
 
             // TODO: Send verification email
             // emailService.sendVerificationEmail(newUser.getEmail(), verificationToken);
-            log.info("[AUTH-SERVICE] User registered successfully: {} (ID: {})",
-                    newUser.getUsername(), newUser.getId());
 
             return mapToAuthResponse(newUser, accessToken);
         } catch (DuplicateResourceFoundException de) {
@@ -101,17 +112,135 @@ public class AuthenticationServiceImpl implements AuthenticationService {
     }
 
     @Override
+    @Transactional(readOnly = true)
     public UserResponse getProfile(UserPrincipal principal) {
-        return null;
+        User user = userRepository.findById(principal.getId())
+                .orElseThrow(() -> {
+                    log.error("[AUTH-SERVICE] User not found with ID: {}", principal.getId());
+                    return new ResourceNotFoundException("User not found with ID: " + principal.getId());
+        });
+
+        return mapToUserResponse(user);
     }
 
+    // No need Transactional
     @Override
     public AuthResponse login(LoginRequest loginRequest, HttpServletRequest request, HttpServletResponse response) {
-        return null;
+        try {
+            Authentication authentication = authenticationManager
+                    .authenticate(new UsernamePasswordAuthenticationToken(
+                            loginRequest.getUsernameOrEmail(),
+                            loginRequest.getPassword()));
+
+            UserPrincipal principal = (UserPrincipal) authentication.getPrincipal();
+            log.info("[AUTH-SERVICE] Authentication successful for user: {} (ID: {})",
+                    principal.getUsername(), principal.getId());
+
+            // Fetch full user entity
+            User user = userRepository.findById(principal.getId())
+                    .orElseThrow(() -> new ResourceNotFoundException("User not found"));
+
+            String clientIp = HeaderExtractor.extractClientIp(request);
+            String userAgent = HeaderExtractor.extractUserAgent(request);
+
+            user.setLastLoginAt(LocalDateTime.now());
+            user.setLastLoginIp(clientIp);
+            user.resetFailedLoginAttempts();
+            userRepository.save(user);
+
+            // Generate Access Token
+            String accessToken = jwtProvider.generateAccessToken(
+                    principal.getUsername(),
+                    principal.getId(),
+                    principal.getEmail(),
+                    principal.getListOfRoles()
+            );
+
+            // Generate Refresh Token
+            RefreshToken refreshToken = refreshTokenService.createRefreshToken(
+                    user, clientIp, userAgent
+            );
+
+            cookiesManager.setRefreshTokenCookie(response, refreshToken.getToken());
+
+            return mapToAuthResponse(user, accessToken);
+
+        } catch (AuthenticationException e) {
+            log.warn("[AUTH-SERVICE] Login failed: {}", e.getMessage());
+
+            updateFailedLoginAttempts(loginRequest.getUsernameOrEmail());
+            throw new BadCredentialsException("Invalid credentials");
+        } catch (AccountLockedException e) {
+            log.warn("[AUTH-SERVICE] Account is locked: {}", e.getMessage());
+            throw e;
+        } catch (Exception e) {
+            log.error("[AUTH-SERVICE] Unexpected error during login: {}", e.getMessage(), e);
+            throw new InternalServerException("Unexpected error occurred!");
+        }
+    }
+
+    private void updateFailedLoginAttempts(String usernameOrEmail) {
+        try {
+            Optional<User> optionalUser = userRepository.findByUsernameOrEmail(usernameOrEmail);
+            if(optionalUser.isPresent()){
+                User user = optionalUser.get();
+                user.incrementFailedLoginAttempts();
+                userRepository.save(user);
+
+                if(user.getFailedLoginAttempts() == 4){
+                    throw new BadCredentialsException("Account will be locked after 1 more failed attempt");
+                }
+
+                if (user.getAccountLocked()) {
+                    log.warn("[AUTH-SERVICE] Account locked due to failed attempts: {} (ID: {})",
+                            user.getUsername(), user.getId());
+                    throw new AccountLockedException("Account is locked for 30 minutes due to failed attempts");
+                }
+            }
+        } catch (BadCredentialsException | AccountLockedException e) {
+            // Re-throw BadCredentialsException
+            throw e;
+        } catch (Exception e) {
+            log.error("[AUTH-SERVICE] Failed to update login attempts: {}", e.getMessage());
+            // Don't fail login process if this fails
+        }
     }
 
     @Override
+    @Transactional(rollbackFor = Exception.class)
     public void logout(UserPrincipal principal, HttpServletResponse response, HttpServletRequest request) {
+        try {
+            // Revoke Refresh Token
+            Optional<String> refreshToken = cookiesManager.extractRefreshTokenFromCookie(request);
+            refreshToken.ifPresent(refreshTokenService::revokeRefreshToken);
+
+            // Blacklist the Access Token in Redis
+            String authHeader = request.getHeader(AUTHORIZATION_HEADER);
+            if(authHeader != null){
+                String accessToken = TokenUtils.validateAndExtractToken(authHeader);
+                Date tokenExpiration = jwtProvider.getExpirationDateFromToken(accessToken);
+                long remainingTtl = tokenExpiration.getTime() - System.currentTimeMillis();
+
+                if (remainingTtl > 0) {
+                    redisService.blackListToken(accessToken, remainingTtl);
+                    log.debug("[AUTH-SERVICE] Access token blacklisted for {}ms", remainingTtl);
+                } else {
+                    log.debug("[AUTH-SERVICE] Access token already expired, skipping blacklist");
+                }
+            }
+
+            cookiesManager.clearRefreshTokenCookie(response);
+            log.info("[AUTH-SERVICE] Logout successful for user: {}", principal.getUsername());
+        } catch (ResourceNotFoundException e) {
+            log.warn("[AUTH-SERVICE] Logout failed: {}", e.getMessage());
+
+            cookiesManager.clearRefreshTokenCookie(response);
+        } catch (Exception e) {
+            log.error("[AUTH-SERVICE] Unexpected error during logout: {}", e.getMessage());
+
+            cookiesManager.clearRefreshTokenCookie(response);
+            throw new InternalServerException("Unexpected error occurred!");
+        }
 
     }
 
@@ -146,7 +275,7 @@ public class AuthenticationServiceImpl implements AuthenticationService {
 
         newUser.addRole(defaultRole);
 
-        log.info("[AUTH-SERVICE] User Object with username: {} is updated successfully", registerRequest.getUsername());
+        log.info("[AUTH-SERVICE] User Object with username: {} is populated successfully", registerRequest.getUsername());
         return newUser;
     }
 
@@ -161,17 +290,5 @@ public class AuthenticationServiceImpl implements AuthenticationService {
             log.warn("[AUTH-SERVICE] User with email {} already exists", email);
             throw new DuplicateResourceFoundException("User with email " + email + " already exists");
         }
-    }
-
-    private void setRefreshTokenCookie(HttpServletResponse response, String refreshToken) {
-        Cookie cookie = new Cookie(REFRESH_TOKEN_COOKIE_NAME, refreshToken);
-        cookie.setHttpOnly(true);
-        cookie.setSecure(false); // Set to true in production with HTTPS
-        cookie.setPath("/");
-        cookie.setMaxAge((int) (REFRESH_TOKEN_DURATION_MS / 1000)); // Convert to seconds
-        cookie.setAttribute("SameSite", "Strict");
-        response.addCookie(cookie);
-
-        log.debug("[AUTH-SERVICE] Set refresh token cookie");
     }
 }

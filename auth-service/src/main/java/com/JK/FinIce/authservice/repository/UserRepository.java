@@ -1,6 +1,7 @@
 package com.JK.FinIce.authservice.repository;
 
 import com.JK.FinIce.authservice.entity.User;
+import io.lettuce.core.dynamic.annotation.Param;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Size;
@@ -13,8 +14,8 @@ import java.util.Optional;
 @Repository
 public interface UserRepository extends JpaRepository<User, Long> {
 
-    @Query("SELECT u FROM User u WHERE u.username = ?1 OR u.email = ?1")
-    Optional<User>  findByUsernameOrEmail(String usernameOrEmail);
+    @Query("SELECT u FROM User u WHERE u.username = :usernameOrEmail OR u.email = :usernameOrEmail")
+    Optional<User> findByUsernameOrEmail(@Param("usernameOrEmail") String usernameOrEmail);
 
     boolean existsByUsername(String username);
 
