@@ -34,3 +34,7 @@ build/
 
 ## Environment Variables
 .env
+
+## Log Files
+*/.log
+logs/
