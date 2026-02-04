@@ -19,6 +19,7 @@ import com.JK.FinIce.authservice.utils.HeaderExtractor;
 import com.JK.FinIce.commonlibrary.exception.InternalServerException;
 import com.JK.FinIce.commonlibrary.exception.InvalidTokenException;
 import com.JK.FinIce.commonlibrary.exception.ResourceNotFoundException;
+import com.JK.FinIce.commonlibrary.exception.ValidationException;
 import com.JK.FinIce.commonlibrary.utils.TokenUtils;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
@@ -137,8 +138,7 @@ public class AuthenticationServiceImpl implements AuthenticationService {
                     principal.getUsername(), principal.getId());
 
             // Fetch full user entity
-            User user = userRepository.findById(principal.getId())
-                    .orElseThrow(() -> new ResourceNotFoundException("User not found"));
+            User user = findUserById(principal.getId());
 
             String clientIp = HeaderExtractor.extractClientIp(request);
             String userAgent = HeaderExtractor.extractUserAgent(request);
@@ -216,18 +216,7 @@ public class AuthenticationServiceImpl implements AuthenticationService {
 
             // Blacklist the Access Token in Redis
             String authHeader = request.getHeader(AUTHORIZATION_HEADER);
-            if(authHeader != null){
-                String accessToken = TokenUtils.validateAndExtractToken(authHeader);
-                Date tokenExpiration = jwtProvider.getExpirationDateFromToken(accessToken);
-                long remainingTtl = tokenExpiration.getTime() - System.currentTimeMillis();
-
-                if (remainingTtl > 0) {
-                    redisService.blackListToken(accessToken, remainingTtl);
-                    log.debug("[AUTH-SERVICE] Access token blacklisted for {}ms", remainingTtl);
-                } else {
-                    log.debug("[AUTH-SERVICE] Access token already expired, skipping blacklist");
-                }
-            }
+            blacklistAccessToken(authHeader);
 
             cookiesManager.clearRefreshTokenCookie(response);
             log.info("[AUTH-SERVICE] Logout successful for user: {}", principal.getUsername());
@@ -241,16 +230,134 @@ public class AuthenticationServiceImpl implements AuthenticationService {
             cookiesManager.clearRefreshTokenCookie(response);
             throw new InternalServerException("Unexpected error occurred!");
         }
+    }
 
+    @Transactional(rollbackFor = Exception.class)
+    public void logoutAll(UserPrincipal principal, HttpServletResponse response, HttpServletRequest request) {
+        try{
+            // Revoke Refresh Token
+            refreshTokenService.revokeAllRefreshTokens(principal.getId());
+
+            // Blacklist the Access Token in Redis
+            String authHeader = request.getHeader(AUTHORIZATION_HEADER);
+            blacklistAccessToken(authHeader);
+
+            cookiesManager.clearRefreshTokenCookie(response);
+            log.info("[AUTH-SERVICE] Logout all successful for user: {}", principal.getUsername());
+
+        } catch (ResourceNotFoundException e){
+            log.warn("[AUTH-SERVICE] Logout all failed: {}", e.getMessage());
+            cookiesManager.clearRefreshTokenCookie(response);
+        } catch (Exception e){
+            log.error("[AUTH-SERVICE] Unexpected error during logout all: {}", e.getMessage());
+            cookiesManager.clearRefreshTokenCookie(response);
+        }
+    }
+
+    private void blacklistAccessToken(String authHeader){
+        if(authHeader != null){
+            String accessToken = TokenUtils.validateAndExtractToken(authHeader);
+            Date tokenExpiration = jwtProvider.getExpirationDateFromToken(accessToken);
+            long remainingTtl = tokenExpiration.getTime() - System.currentTimeMillis();
+
+            if (remainingTtl > 0) {
+                redisService.blackListToken(accessToken, remainingTtl);
+                log.debug("[AUTH-SERVICE] Access token blacklisted for {}ms", remainingTtl);
+            } else {
+                log.debug("[AUTH-SERVICE] Access token already expired, skipping blacklist");
+            }
+        }
     }
 
     @Override
-    public UserResponse updateUserProfile(UpdateUserRequest updateUserRequest, UserPrincipal principal, HttpServletRequest request, HttpServletResponse response) {
-        return null;
+    @Transactional(rollbackFor = Exception.class)
+    public UserResponse updateUserProfile(UpdateUserRequest updateUserRequest,
+                                          UserPrincipal principal,
+                                          HttpServletRequest request, HttpServletResponse response) {
+        try{
+            if(!updateUserRequest.isAtLeastOneFieldProvided()){
+                throw new ValidationException("At least one field must be provided for update");
+            }
+            User userEntity = findUserById(principal.getId());
+
+            populateEntityWithLatestData(userEntity, updateUserRequest);
+
+            User updatedUser = userRepository.save(userEntity);
+            log.info("[AUTH-SERVICE] User profile updated successfully for user: {}", principal.getUsername());
+
+            return mapToUserResponse(updatedUser);
+
+        } catch (DuplicateResourceFoundException de){
+            throw de;
+        } catch (Exception e){
+            log.error("[AUTH-SERVICE] Unexpected error occurred while updating user profile: {}", e.getMessage());
+            throw new InternalServerException("Unexpected error occurred!");
+        }
+    }
+
+    private void populateEntityWithLatestData(User userEntity, UpdateUserRequest updateUserRequest) {
+
+        if(updateUserRequest.getUsername() != null &&
+                !updateUserRequest.getUsername().equals(userEntity.getUsername())){
+
+            boolean alreadyPresent = userRepository.existsByUsername(updateUserRequest.getUsername());
+            if(alreadyPresent){
+                log.warn("[AUTH-SERVICE] Username {} already exists", updateUserRequest.getUsername());
+                throw new DuplicateResourceFoundException("Username already exists");
+            }
+            userEntity.setUsername(updateUserRequest.getUsername());
+        }
+
+        if(updateUserRequest.getFirstName() != null){
+            userEntity.setFirstName(updateUserRequest.getFirstName());
+        }
+        if(updateUserRequest.getLastName() != null){
+            userEntity.setLastName(updateUserRequest.getLastName());
+        }
+        if(updateUserRequest.getPhoneNumber() != null){
+            userEntity.setPhoneNumber(updateUserRequest.getPhoneNumber());
+        }
     }
 
     @Override
-    public void changePassword(ChangePasswordRequest passwordRequest, UserPrincipal principal) {
+    @Transactional(rollbackFor = Exception.class)
+    public void changePassword(ChangePasswordRequest passwordRequest, UserPrincipal principal,
+                               HttpServletRequest request, HttpServletResponse response) {
+        try{
+            User userEntity = findUserById(principal.getId());
+            String savedPassword = userEntity.getPassword();
+            boolean isCurrentPasswordValid = passwordEncoder.matches(passwordRequest.getCurrentPassword(), savedPassword);
+            if(!isCurrentPasswordValid){
+                throw new BadCredentialsException("Current password is incorrect");
+            }
+
+            // checks the match of the new password and confirm password
+            if(!passwordRequest.isPasswordsMatch()){
+                throw new ValidationException("Confirm password does not match with the new password");
+            }
+
+            if (passwordEncoder.matches(passwordRequest.getNewPassword(), savedPassword)) {
+                throw new ValidationException("New password must be different from current password");
+            }
+
+            userEntity.setPassword(passwordEncoder.encode(passwordRequest.getNewPassword()));
+            userEntity.setPasswordChangedAt(LocalDateTime.now());
+            userRepository.save(userEntity);
+
+            logoutAll(principal, response, request);
+            log.info("[AUTH-SERVICE] Password changed successfully for user: {}", principal.getUsername());
+
+        } catch (BadCredentialsException | ValidationException e) {
+            log.warn("[AUTH-SERVICE] Password change failed for user {}: {}",
+                    principal.getUsername(), e.getMessage());
+            throw e;
+        } catch (ResourceNotFoundException e) {
+            log.error("[AUTH-SERVICE] User not found during password change: {}", e.getMessage());
+            throw e;
+        } catch (Exception e){
+            log.error("[AUTH-SERVICE] Unexpected error occurred while changing password: {}", e.getMessage());
+            throw new InternalServerException("Unexpected error occurred!");
+        }
 
     }
 
@@ -290,5 +397,10 @@ public class AuthenticationServiceImpl implements AuthenticationService {
             log.warn("[AUTH-SERVICE] User with email {} already exists", email);
             throw new DuplicateResourceFoundException("User with email " + email + " already exists");
         }
+    }
+
+    private User findUserById(Long userId){
+        return userRepository.findById(userId)
+                .orElseThrow(() -> new ResourceNotFoundException("User not found with ID: " + userId));
     }
 }

@@ -17,10 +17,6 @@ public class UpdateUserRequest {
     @Pattern(regexp = "^[a-zA-Z0-9_-]+$", message = "Username can only contain letters, numbers, underscores, and hyphens")
     private String username;
 
-    @Email(message = "Invalid email format")
-    @Size(max = 100, message = "Email must not exceed 100 characters")
-    private String email;
-
     @Size(min = 1, max = 50, message = "First name must not exceed 50 characters")
     private String firstName;
 
@@ -32,7 +28,7 @@ public class UpdateUserRequest {
 
     @AssertTrue(message = "At least one field must be provided for update")
     public boolean isAtLeastOneFieldProvided() {
-        return username != null || email != null || firstName != null ||
+        return username != null || firstName != null ||
                 lastName != null || phoneNumber != null;
     }
 }

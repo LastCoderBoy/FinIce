@@ -76,10 +76,10 @@ public class AuthenticationController {
     }
 
     @PatchMapping("/update")
-    public ResponseEntity<ApiResponse<UserResponse>> update(@RequestBody UpdateUserRequest updateUserRequest,
-                                                            @AuthenticationPrincipal UserPrincipal principal,
-                                                            HttpServletRequest request,
-                                                            HttpServletResponse response){
+    public ResponseEntity<ApiResponse<UserResponse>> updateProfile(@RequestBody UpdateUserRequest updateUserRequest,
+                                                                   @AuthenticationPrincipal UserPrincipal principal,
+                                                                   HttpServletRequest request,
+                                                                   HttpServletResponse response){
         log.info("[AUTH-CONTROLLER] Updating user details...");
 
         UserResponse userResponse = authService.updateUserProfile(updateUserRequest, principal, request, response);
@@ -89,10 +89,12 @@ public class AuthenticationController {
 
     @PostMapping("/change-password")
     public ResponseEntity<ApiResponse<Void>> changePassword(@Valid @RequestBody ChangePasswordRequest passwordRequest,
-                                                            @AuthenticationPrincipal UserPrincipal principal){
+                                                            @AuthenticationPrincipal UserPrincipal principal,
+                                                            HttpServletRequest request,
+                                                            HttpServletResponse response){
         log.info("[AUTH-CONTROLLER] Changing password for user: {}", principal.getUsername());
 
-        authService.changePassword(passwordRequest, principal);
-        return ResponseEntity.ok(ApiResponse.success("Password changed successfully"));
+        authService.changePassword(passwordRequest, principal, request, response);
+        return ResponseEntity.ok(ApiResponse.success("Password changed successfully, please re-login with the new credentials"));
     }
 }
