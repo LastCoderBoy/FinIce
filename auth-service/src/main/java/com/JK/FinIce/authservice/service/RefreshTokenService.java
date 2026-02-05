@@ -9,6 +9,8 @@ public interface RefreshTokenService {
 
     RefreshToken findByToken(String token);
 
+    RefreshToken verifyRefreshToken(String token);
+
     RefreshToken rotateRefreshToken(RefreshToken oldToken, String clientIP, String userAgent);
 
     void revokeRefreshToken(String token);

@@ -19,7 +19,7 @@ public class UserMapper {
                 .lastName(user.getLastName())
                 .roles(user.getRoles().stream()
                         .map(role -> role.getName().name())
-                        .collect(Collectors.toSet())
+                        .collect(Collectors.toList())
                 )
                 .build();
 

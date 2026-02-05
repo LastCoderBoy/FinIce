@@ -68,10 +68,6 @@ public class JwtProvider {
                 .compact();
     }
 
-    public String generateRefreshToken() {
-        return TokenUtils.generateSecureToken();
-    }
-
     /**
      * Validate JWT token
      * Checks signature, expiration, and format

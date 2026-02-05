@@ -5,6 +5,7 @@ import com.JK.FinIce.authservice.entity.User;
 import com.JK.FinIce.authservice.exception.JwtAuthenticationException;
 import com.JK.FinIce.authservice.repository.RefreshTokenRepository;
 import com.JK.FinIce.authservice.service.RefreshTokenService;
+import com.JK.FinIce.commonlibrary.exception.InvalidTokenException;
 import com.JK.FinIce.commonlibrary.exception.ResourceNotFoundException;
 import com.JK.FinIce.commonlibrary.utils.TokenUtils;
 import lombok.RequiredArgsConstructor;
@@ -51,12 +52,31 @@ public class RefreshTokenServiceImpl implements RefreshTokenService {
     }
 
     @Override
+    @Transactional(readOnly = true)
     public RefreshToken findByToken(String token) {
         return refreshTokenRepository.findByToken(token)
                 .orElseThrow(() -> {
                     log.warn("[REFRESH-TOKEN-SERVICE] Refresh token not found");
                     return new ResourceNotFoundException("Invalid refresh token");
                 });
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public RefreshToken verifyRefreshToken(String token) {
+        RefreshToken refreshToken = findByToken(token);
+
+        if (refreshToken.isExpired()) {
+            log.warn("[REFRESH-TOKEN-SERVICE] Refresh token expired");
+            throw new InvalidTokenException("Refresh token has expired. Please log in again.");
+        }
+
+        if (refreshToken.getRevoked()) {
+            log.warn("[REFRESH-TOKEN-SERVICE] Refresh token has been revoked");
+            throw new InvalidTokenException("Refresh token has been revoked");
+        }
+
+        return refreshToken;
     }
 
 

@@ -46,7 +46,7 @@ public final class AppConstants {
     public static final List<String> PUBLIC_PATHS = List.of(
             AUTH_PATH + "/register",
             AUTH_PATH + "/login",
-            AUTH_PATH + "/token/refresh",
+            AUTH_PATH + "/refresh-token",
             AUTH_PATH + "/verify-email/**",
             AUTH_PATH + "/forgot-password",
             AUTH_PATH + "/reset-password",

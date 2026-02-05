@@ -26,4 +26,6 @@ public interface AuthenticationService {
 
     void changePassword(ChangePasswordRequest passwordRequest, UserPrincipal principal,
                         HttpServletRequest request, HttpServletResponse response);
+
+    AuthResponse refreshJwtTokens(HttpServletRequest request, HttpServletResponse response);
 }

@@ -97,4 +97,15 @@ public class AuthenticationController {
         authService.changePassword(passwordRequest, principal, request, response);
         return ResponseEntity.ok(ApiResponse.success("Password changed successfully, please re-login with the new credentials"));
     }
+
+    @PostMapping("/refresh-token")
+    public ResponseEntity<ApiResponse<AuthResponse>> refreshJwtToken(HttpServletRequest request,
+                                                                     HttpServletResponse response) {
+        log.info("[AUTH-CONTROLLER] Refreshing JWT tokens...");
+        AuthResponse authResponse = authService.refreshJwtTokens(request, response);
+
+        return ResponseEntity.ok(
+                ApiResponse.success("JWT tokens refreshed successfully", authResponse)
+        );
+    }
 }

@@ -123,22 +123,6 @@ public class User {
         }
     }
 
-    public void addRefreshToken(RefreshToken refreshToken) {
-        if (refreshToken == null) {
-            return;
-        }
-        this.refreshTokens.add(refreshToken);
-        refreshToken.setUser(this);  // Set parent reference
-    }
-
-    public void removeRefreshToken(RefreshToken refreshToken) {
-        if (refreshToken == null) {
-            return;
-        }
-        this.refreshTokens.remove(refreshToken);
-        refreshToken.setUser(null);
-    }
-
     public boolean isAccountNonLocked(){
         if (!accountLocked) {
             return true;

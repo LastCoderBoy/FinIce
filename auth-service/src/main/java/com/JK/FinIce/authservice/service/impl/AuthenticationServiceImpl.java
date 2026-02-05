@@ -361,7 +361,69 @@ public class AuthenticationServiceImpl implements AuthenticationService {
 
     }
 
-    private User createUserEntity(RegisterRequest registerRequest, String clientIP) {
+    @Override
+    @Transactional
+    public AuthResponse refreshJwtTokens(HttpServletRequest request, HttpServletResponse response) {
+        Optional<String> optionalRefreshToken = cookiesManager.extractRefreshTokenFromCookie(request);
+        if(optionalRefreshToken.isEmpty()){
+            throw new ResourceNotFoundException("Request does not contain refresh token cookie");
+        }
+        // Extract Headers
+        String clientIp = HeaderExtractor.extractClientIp(request);
+        String userAgent = HeaderExtractor.extractUserAgent(request);
+
+        // verify the old refresh token and create a new one
+        String token = optionalRefreshToken.get();
+        RefreshToken oldRefreshToken = refreshTokenService.verifyRefreshToken(token); // method will resolve the Lazy Exception
+
+        User user = oldRefreshToken.getUser();
+        validateUserAccountForTokenRefresh(user);
+
+        // Generate new Refresh Token
+        RefreshToken newRefreshToken = refreshTokenService.rotateRefreshToken(
+                oldRefreshToken,
+                clientIp,
+                userAgent
+        );
+
+        user.setLastLoginAt(LocalDateTime.now());
+        user.setLastLoginIp(clientIp);
+        userRepository.save(user);
+
+        // Generate new Access Token
+        String username = user.getUsername();
+        Long userId = user.getId();
+        String email = user.getEmail();
+        List<String> userRoles = user.getRoles().stream()
+                .map(role -> role.getName().name())
+                .toList();
+
+        String accessToken = jwtProvider.generateAccessToken(username, userId, email, userRoles);
+
+        // Set the Refresh token cookie
+        cookiesManager.setRefreshTokenCookie(response, newRefreshToken.getToken());
+
+        return mapToAuthResponse(user, accessToken);
+    }
+
+    private void validateUserAccountForTokenRefresh(User user) {
+        if(user.getAccountStatus() == AccountStatus.CLOSED ||
+                user.getAccountStatus() == AccountStatus.SUSPENDED){
+            throw new AccountLockedException("User account is " + user.getAccountStatus().name() + ". Cannot refresh token");
+        }
+        if(user.getAccountLocked()){
+            if (user.getAccountLockedUntil() != null &&
+                    LocalDateTime.now().isAfter(user.getAccountLockedUntil())) {
+                // Lock expired, unlock
+                user.resetFailedLoginAttempts();
+            } else {
+                throw new AccountLockedException("Account is locked");
+            }
+        }
+    }
+
+
+        private User createUserEntity(RegisterRequest registerRequest, String clientIP) {
         Role defaultRole = roleQueryService.getOrCreateDefaultRole(); // ROLE_USER
 
         User newUser = User.builder()

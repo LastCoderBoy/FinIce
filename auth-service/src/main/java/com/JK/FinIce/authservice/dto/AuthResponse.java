@@ -2,6 +2,7 @@ package com.JK.FinIce.authservice.dto;
 
 import lombok.*;
 
+import java.util.List;
 import java.util.Set;
 
 @Getter
@@ -27,6 +28,6 @@ public class AuthResponse {
         private String email;
         private String firstName;
         private String lastName;
-        private Set<String> roles;
+        private List<String> roles;
     }
 }
