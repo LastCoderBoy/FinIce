@@ -149,9 +149,8 @@ public class UserPrincipal implements UserDetails {
      */
     @Override
     public boolean isEnabled() {
-//        return accountStatus == AccountStatus.ACTIVE &&       // TODO: Uncomment once the Email Verification feature is implemented
-//                (emailVerified == null || emailVerified);
-        return UserDetails.super.isEnabled();
+        return accountStatus == AccountStatus.ACTIVE &&
+                (emailVerified == null || emailVerified);
     }
 
     // ==================== Helper Methods ====================

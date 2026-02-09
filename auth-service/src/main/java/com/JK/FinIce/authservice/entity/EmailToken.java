@@ -1,5 +1,6 @@
 package com.JK.FinIce.authservice.entity;
 
+import com.JK.FinIce.authservice.enums.TokenType;
 import jakarta.persistence.*;
 import lombok.*;
 import org.hibernate.annotations.CreationTimestamp;
@@ -8,10 +9,11 @@ import java.time.LocalDateTime;
 
 @Entity
 @Table(
-        name = "password_reset_tokens",
+        name = "email_tokens",
         indexes = {
                 @Index(name = "idx_token", columnList = "token"),
-                @Index(name = "idx_user_id", columnList = "user_id")
+                @Index(name = "idx_user_id", columnList = "user_id"),
+                @Index(name = "idx_token_type", columnList = "tokenType")
         }
 )
 @Getter
@@ -19,7 +21,7 @@ import java.time.LocalDateTime;
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
-public class PasswordResetToken {
+public class EmailToken {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -28,15 +30,16 @@ public class PasswordResetToken {
     @Column(nullable = false, unique = true, length = 100)
     private String token;
 
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false, length = 50)
+    private TokenType tokenType;
+
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "user_id", nullable = false)
     private User user;
 
     @Column(nullable = false)
     private LocalDateTime expiresAt;
-
-    @Column(nullable = false)
-    private Boolean used = false;
 
     @Column
     private LocalDateTime usedAt;
@@ -50,12 +53,15 @@ public class PasswordResetToken {
         return LocalDateTime.now().isAfter(expiresAt);
     }
 
+    public boolean isUsed() {
+        return usedAt != null;
+    }
+
     public boolean isValid() {
-        return !used && !isExpired();
+        return !isExpired() && !isUsed();
     }
 
     public void markAsUsed() {
-        this.used = true;
         this.usedAt = LocalDateTime.now();
     }
 }

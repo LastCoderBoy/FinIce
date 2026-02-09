@@ -2,6 +2,8 @@ package com.JK.FinIce.authservice.exception.handler;
 
 
 import com.JK.FinIce.authservice.exception.AccountLockedException;
+import com.JK.FinIce.authservice.exception.AccountNotVerifiedException;
+import com.JK.FinIce.authservice.exception.DuplicateResourceFoundException;
 import com.JK.FinIce.authservice.exception.JwtAuthenticationException;
 import com.JK.FinIce.commonlibrary.dto.ApiResponse;
 import com.JK.FinIce.commonlibrary.exception.InternalServerException;
@@ -68,9 +70,28 @@ public class AuthenticationExceptionHandler {
                 .body(ApiResponse.error(ex.getMessage()));
     }
 
+    @ExceptionHandler(DuplicateResourceFoundException.class)
+    public ResponseEntity<ApiResponse<Void>> handleDuplicateResourceFoundException(DuplicateResourceFoundException ex) {
+        log.warn("[AUTH-EXCEPTION-HANDLER] Duplicate resource found: {}", ex.getMessage());
+
+        return ResponseEntity
+                .status(HttpStatus.BAD_REQUEST)
+                .body(ApiResponse.error(ex.getMessage()));
+    }
+
+
     @ExceptionHandler(AccountLockedException.class)
     public ResponseEntity<ApiResponse<Void>> handleAccountLockedException(AccountLockedException ex) {
         log.warn("[AUTH-EXCEPTION-HANDLER] Account locked: {}", ex.getMessage());
+
+        return ResponseEntity
+                .status(HttpStatus.FORBIDDEN)
+                .body(ApiResponse.error(ex.getMessage()));
+    }
+
+    @ExceptionHandler(AccountNotVerifiedException.class)
+    public ResponseEntity<ApiResponse<Void>> handleAccountNotVerifiedException(AccountNotVerifiedException ex) {
+        log.warn("[AUTH-EXCEPTION-HANDLER] Account not verified: {}", ex.getMessage());
 
         return ResponseEntity
                 .status(HttpStatus.FORBIDDEN)

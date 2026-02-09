@@ -76,7 +76,7 @@ public class AuthenticationController {
     }
 
     @PatchMapping("/update")
-    public ResponseEntity<ApiResponse<UserResponse>> updateProfile(@RequestBody UpdateUserRequest updateUserRequest,
+    public ResponseEntity<ApiResponse<UserResponse>> updateProfile(@RequestBody @Valid UpdateUserRequest updateUserRequest,
                                                                    @AuthenticationPrincipal UserPrincipal principal,
                                                                    HttpServletRequest request,
                                                                    HttpServletResponse response){
@@ -90,12 +90,13 @@ public class AuthenticationController {
     @PostMapping("/change-password")
     public ResponseEntity<ApiResponse<Void>> changePassword(@Valid @RequestBody ChangePasswordRequest passwordRequest,
                                                             @AuthenticationPrincipal UserPrincipal principal,
-                                                            HttpServletRequest request,
                                                             HttpServletResponse response){
         log.info("[AUTH-CONTROLLER] Changing password for user: {}", principal.getUsername());
 
-        authService.changePassword(passwordRequest, principal, request, response);
-        return ResponseEntity.ok(ApiResponse.success("Password changed successfully, please re-login with the new credentials"));
+        authService.changePassword(passwordRequest, principal, response);
+        return ResponseEntity.ok(
+                ApiResponse.success("Password changed successfully, please re-login with the new credentials")
+        );
     }
 
     @PostMapping("/refresh-token")

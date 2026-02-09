@@ -10,7 +10,9 @@ import com.JK.FinIce.commonlibrary.exception.ResourceNotFoundException;
 import com.JK.FinIce.commonlibrary.utils.TokenUtils;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Instant;
@@ -105,9 +107,15 @@ public class RefreshTokenServiceImpl implements RefreshTokenService {
      * Revoke all refresh tokens for a user (used on password change, logout from all devices)
      */
     @Override
-    @Transactional
-    public void revokeAllRefreshTokens(Long userId) {
-        int revokedCount = refreshTokenRepository.revokeAllByUserId(userId);
-        log.info("[REFRESH-TOKEN-SERVICE] Revoked {} refresh tokens for user: {}", revokedCount, userId);
+    @Async("taskExecutor")
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
+    public void revokeAllRefreshTokensAsync(Long userId) {
+        try {
+            int revokedCount = refreshTokenRepository.revokeAllByUserId(userId);
+            log.info("[REFRESH-TOKEN-SERVICE] Revoked {} refresh tokens for user: {}", revokedCount, userId);
+        } catch (Exception e) {
+            log.error("[REFRESH-TOKEN-SERVICE] Error revoking refresh tokens for user {}: {}",
+                    userId, e.getMessage(), e);
+        }
     }
 }

@@ -4,16 +4,17 @@ import com.JK.FinIce.authservice.config.AuthCookiesManager;
 import com.JK.FinIce.authservice.config.redis.RedisService;
 import com.JK.FinIce.authservice.config.security.JwtProvider;
 import com.JK.FinIce.authservice.dto.*;
-import com.JK.FinIce.authservice.entity.RefreshToken;
-import com.JK.FinIce.authservice.entity.Role;
-import com.JK.FinIce.authservice.entity.User;
-import com.JK.FinIce.authservice.entity.UserPrincipal;
+import com.JK.FinIce.authservice.service.email.EmailService;
+import com.JK.FinIce.authservice.entity.*;
 import com.JK.FinIce.authservice.enums.AccountStatus;
+import com.JK.FinIce.authservice.enums.TokenType;
 import com.JK.FinIce.authservice.exception.AccountLockedException;
+import com.JK.FinIce.authservice.exception.AccountNotVerifiedException;
 import com.JK.FinIce.authservice.exception.DuplicateResourceFoundException;
 import com.JK.FinIce.authservice.queryService.RoleQueryService;
 import com.JK.FinIce.authservice.repository.UserRepository;
 import com.JK.FinIce.authservice.service.AuthenticationService;
+import com.JK.FinIce.authservice.service.EmailTokenService;
 import com.JK.FinIce.authservice.service.RefreshTokenService;
 import com.JK.FinIce.authservice.utils.HeaderExtractor;
 import com.JK.FinIce.commonlibrary.exception.InternalServerException;
@@ -25,13 +26,16 @@ import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.scheduling.annotation.Async;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.BadCredentialsException;
+import org.springframework.security.authentication.DisabledException;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.AuthenticationException;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
@@ -48,14 +52,18 @@ import static com.JK.FinIce.commonlibrary.constants.AppConstants.AUTHORIZATION_H
 @RequiredArgsConstructor
 public class AuthenticationServiceImpl implements AuthenticationService {
 
+    private final EmailTokenService emailTokenService;
+    private final EmailService emailService;
     private final AuthCookiesManager cookiesManager;
-    private final UserRepository userRepository;
     private final JwtProvider jwtProvider;
     private final RedisService redisService;
     private final RoleQueryService roleQueryService;
     private final PasswordEncoder passwordEncoder;
     private final RefreshTokenService refreshTokenService;
     private final AuthenticationManager authenticationManager;
+
+    // =========== REPOSITORIES ===========
+    private final UserRepository userRepository;
 
     @Transactional(rollbackFor = Exception.class)  // Rollback on ANY exception
     @Override
@@ -96,8 +104,17 @@ public class AuthenticationServiceImpl implements AuthenticationService {
             // Set the Refresh token cookie
             cookiesManager.setRefreshTokenCookie(response, refreshToken.getToken());
 
-            // TODO: Send verification email
-            // emailService.sendVerificationEmail(newUser.getEmail(), verificationToken);
+            // Send verification email
+            EmailToken verificationToken = emailTokenService.createEmailToken(newUser, TokenType.EMAIL_VERIFICATION);
+            try {
+                emailService.sendVerificationEmail(
+                        newUser,
+                        verificationToken
+                );
+            } catch (Exception e) {
+                log.error("[AUTH-SERVICE] Failed to send verification email: {}", e.getMessage());
+                // No need to break...
+            }
 
             return mapToAuthResponse(newUser, accessToken);
         } catch (DuplicateResourceFoundException de) {
@@ -165,6 +182,10 @@ public class AuthenticationServiceImpl implements AuthenticationService {
 
             return mapToAuthResponse(user, accessToken);
 
+        } catch (DisabledException e) {
+            log.warn("[AUTH-SERVICE] Account is not verified: {}", loginRequest.getUsernameOrEmail());
+
+            throw new AccountNotVerifiedException("Account is still Pending. Please verify your email first.");
         } catch (AuthenticationException e) {
             log.warn("[AUTH-SERVICE] Login failed: {}", e.getMessage());
 
@@ -198,7 +219,7 @@ public class AuthenticationServiceImpl implements AuthenticationService {
                 }
             }
         } catch (BadCredentialsException | AccountLockedException e) {
-            // Re-throw BadCredentialsException
+            // Re-throw
             throw e;
         } catch (Exception e) {
             log.error("[AUTH-SERVICE] Failed to update login attempts: {}", e.getMessage());
@@ -229,28 +250,6 @@ public class AuthenticationServiceImpl implements AuthenticationService {
 
             cookiesManager.clearRefreshTokenCookie(response);
             throw new InternalServerException("Unexpected error occurred!");
-        }
-    }
-
-    @Transactional(rollbackFor = Exception.class)
-    public void logoutAll(UserPrincipal principal, HttpServletResponse response, HttpServletRequest request) {
-        try{
-            // Revoke Refresh Token
-            refreshTokenService.revokeAllRefreshTokens(principal.getId());
-
-            // Blacklist the Access Token in Redis
-            String authHeader = request.getHeader(AUTHORIZATION_HEADER);
-            blacklistAccessToken(authHeader);
-
-            cookiesManager.clearRefreshTokenCookie(response);
-            log.info("[AUTH-SERVICE] Logout all successful for user: {}", principal.getUsername());
-
-        } catch (ResourceNotFoundException e){
-            log.warn("[AUTH-SERVICE] Logout all failed: {}", e.getMessage());
-            cookiesManager.clearRefreshTokenCookie(response);
-        } catch (Exception e){
-            log.error("[AUTH-SERVICE] Unexpected error during logout all: {}", e.getMessage());
-            cookiesManager.clearRefreshTokenCookie(response);
         }
     }
 
@@ -287,7 +286,7 @@ public class AuthenticationServiceImpl implements AuthenticationService {
 
             return mapToUserResponse(updatedUser);
 
-        } catch (DuplicateResourceFoundException de){
+        } catch (DuplicateResourceFoundException | ValidationException de){
             throw de;
         } catch (Exception e){
             log.error("[AUTH-SERVICE] Unexpected error occurred while updating user profile: {}", e.getMessage());
@@ -321,8 +320,7 @@ public class AuthenticationServiceImpl implements AuthenticationService {
 
     @Override
     @Transactional(rollbackFor = Exception.class)
-    public void changePassword(ChangePasswordRequest passwordRequest, UserPrincipal principal,
-                               HttpServletRequest request, HttpServletResponse response) {
+    public void changePassword(ChangePasswordRequest passwordRequest, UserPrincipal principal, HttpServletResponse response) {
         try{
             User userEntity = findUserById(principal.getId());
             String savedPassword = userEntity.getPassword();
@@ -344,9 +342,13 @@ public class AuthenticationServiceImpl implements AuthenticationService {
             userEntity.setPasswordChangedAt(LocalDateTime.now());
             userRepository.save(userEntity);
 
-            logoutAll(principal, response, request);
-            log.info("[AUTH-SERVICE] Password changed successfully for user: {}", principal.getUsername());
+            cookiesManager.clearRefreshTokenCookie(response);
+            log.debug("[AUTH-SERVICE] Refresh token cookie cleared");
 
+            refreshTokenService.revokeAllRefreshTokensAsync(principal.getId());
+
+            log.info("[AUTH-SERVICE] Password changed successfully for user: {} (ID: {})",
+                    principal.getUsername(), principal.getId());
         } catch (BadCredentialsException | ValidationException e) {
             log.warn("[AUTH-SERVICE] Password change failed for user {}: {}",
                     principal.getUsername(), e.getMessage());
@@ -358,7 +360,35 @@ public class AuthenticationServiceImpl implements AuthenticationService {
             log.error("[AUTH-SERVICE] Unexpected error occurred while changing password: {}", e.getMessage());
             throw new InternalServerException("Unexpected error occurred!");
         }
+    }
 
+    /**
+     * Logout from all devices asynchronously
+     * Runs AFTER response is sent to client
+     *
+     * @param userId User ID
+     * @param authHeader Authorization header (contains current access token)
+     */
+    @Transactional
+    public void logoutAll(Long userId, String authHeader) {
+        try{
+            // Revoke Refresh Token
+            refreshTokenService.revokeAllRefreshTokensAsync(userId);
+
+            // Blacklist the Access Token in Redis
+            if (authHeader != null) {
+                blacklistAccessToken(authHeader);
+            } else {
+                log.warn("[AUTH-SERVICE] No authorization header found for blacklisting");
+            }
+
+            log.info("[AUTH-SERVICE] Logout all successful for user ID: {}", userId);
+
+        } catch (Exception e){
+            // Don't throw - this is async, exceptions are logged by AsyncUncaughtExceptionHandler
+            log.error("[AUTH-SERVICE] Error during async logout for user {}: {}",
+                    userId, e.getMessage(), e);
+        }
     }
 
     @Override

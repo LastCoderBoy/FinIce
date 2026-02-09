@@ -1,0 +1,102 @@
+/* Email Container */
+.email-container {
+    max-width: 600px;
+    margin: 0 auto;
+    font-family: Arial, Helvetica, sans-serif;
+    background-color: #ffffff;
+}
+
+/* Header */
+.email-header {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: #ffffff;
+    padding: 30px 20px;
+    text-align: center;
+}
+
+.email-header h1 {
+    margin: 0;
+    font-size: 28px;
+    font-weight: bold;
+}
+
+/* Body */
+.email-body {
+    padding: 40px 30px;
+    background-color: #ffffff;
+}
+
+.email-body h2 {
+    color: #333333;
+    font-size: 24px;
+    margin-bottom: 20px;
+}
+
+.email-body p {
+    color: #555555;
+    font-size: 16px;
+    line-height: 1.6;
+    margin-bottom: 15px;
+}
+
+/* Button */
+.button-container {
+    text-align: center;
+    margin: 30px 0;
+}
+
+.verify-button {
+    display: inline-block;
+    padding: 15px 40px;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: #ffffff !important;
+    text-decoration: none;
+    border-radius: 5px;
+    font-size: 16px;
+    font-weight: bold;
+    transition: transform 0.2s;
+}
+
+.verify-button:hover {
+    transform: scale(1.05);
+}
+
+/* Expiry Notice */
+.expiry-notice {
+    color: #e74c3c;
+    font-size: 14px;
+    text-align: center;
+    margin: 20px 0;
+    font-weight: bold;
+}
+
+/* Help Section */
+.help-section {
+    background-color: #f8f9fa;
+    padding: 20px;
+    border-radius: 5px;
+    margin-top: 30px;
+}
+
+.help-section p {
+    margin-bottom: 10px;
+}
+
+.link-text {
+    word-break: break-all;
+    color: #667eea;
+    font-size: 14px;
+}
+
+/* Footer */
+.email-footer {
+    background-color: #f8f9fa;
+    padding: 20px;
+    text-align: center;
+    color: #777777;
+    font-size: 12px;
+}
+
+.email-footer p {
+    margin: 5px 0;
+}
