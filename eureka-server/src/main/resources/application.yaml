@@ -1,0 +1,58 @@
+# ========================================
+# EUREKA SERVER CONFIGURATION
+# ========================================
+spring:
+  application:
+    name: eureka-server
+
+server:
+  port: 8761
+
+# ========================================
+# EUREKA SERVER SETTINGS
+# ========================================
+eureka:
+  instance:
+    hostname: localhost
+    prefer-ip-address: false
+
+  client:
+    # Don't register itself as a client
+    register-with-eureka: false
+    fetch-registry: false
+    service-url:
+      defaultZone: http://${eureka.instance.hostname}:${server.port}/eureka/
+
+  server:
+    # Disable self-preservation mode in development
+    enable-self-preservation: false
+    # Eviction interval (how often to check for down services)
+    eviction-interval-timer-in-ms: 5000
+    # Response cache update interval
+    response-cache-update-interval-ms: 5000
+
+# ========================================
+# ACTUATOR CONFIGURATION
+# ========================================
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+  endpoint:
+    health:
+      show-details: always
+
+# ========================================
+# LOGGING CONFIGURATION
+# ========================================
+logging:
+  level:
+    root: INFO
+    com.netflix.eureka: INFO
+    com.netflix.discovery: INFO
+    com:
+      netflix:
+        eureka:
+          registry: WARN
+          resources: WARN
