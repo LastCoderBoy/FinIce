@@ -1,0 +1,7 @@
+package com.jk.finice.authservice.enums;
+
+public enum TokenType {
+    EMAIL_VERIFICATION,
+    PASSWORD_RESET,
+    EMAIL_CHANGE_CONFIRMATION
+}

@@ -9,7 +9,7 @@ spring:
   # DATABASE CONFIGURATION
   # ========================================
   datasource:
-    url: ${AUTH_DB_URL:jdbc:postgresql://localhost:5432/finice_auth}
+    url: jdbc:postgresql://${DB_HOST}:${DB_PORT}/${AUTH_DB_NAME}
     username: ${AUTH_DB_USER:postgres}
     password: ${AUTH_DB_PASSWORD:postgres}
     driver-class-name: org.postgresql.Driver
@@ -36,8 +36,8 @@ spring:
   # ========================================
   data:
     redis:
-      host: ${REDIS_HOST:localhost}
-      port: ${REDIS_PORT:6379}
+      host: ${REDIS_HOST}
+      port: ${REDIS_PORT}
       password: ${REDIS_PASSWORD:}
       database: 0
       timeout: 2000ms
@@ -70,7 +70,7 @@ spring:
 # SERVER CONFIGURATION
 # ========================================
 server:
-  port: ${AUTH_SERVICE_PORT:8081}
+  port: ${AUTH_SERVICE_PORT}
   servlet:
     context-path: /
 
@@ -79,7 +79,7 @@ server:
 # ========================================
 email:
   verification:
-    url: ${EMAIL_VERIFICATION_URL:http://localhost:8080/api/v1/auth}
+    url: ${EMAIL_VERIFICATION_URL}
 
 # ========================================
 # EUREKA CLIENT CONFIGURATION
@@ -87,7 +87,7 @@ email:
 eureka:
   client:
     service-url:
-      defaultZone: ${EUREKA_URL:http://localhost:8761/eureka/}
+      defaultZone: ${EUREKA_URL}
     fetch-registry: true
     register-with-eureka: true
     registry-fetch-interval-seconds: 30
