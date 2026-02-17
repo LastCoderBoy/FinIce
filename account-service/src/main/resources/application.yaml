@@ -1,3 +1,123 @@
+# ========================================
+# ACCOUNT SERVICE CONFIGURATION
+# ========================================
 spring:
   application:
     name: account-service
+
+  # ========================================
+  # DATABASE CONFIGURATION
+  # ========================================
+  datasource:
+    url: ${ACCOUNT_DB_URL:jdbc:postgresql://localhost:5432/finice_accounts}
+    username: ${ACCOUNT_DB_USER:postgres}
+    password: ${ACCOUNT_DB_PASSWORD:postgres}
+    driver-class-name: org.postgresql.Driver
+
+    hikari:
+      maximum-pool-size: 20
+      minimum-idle: 5
+      connection-timeout: 30000
+      idle-timeout: 600000
+      max-lifetime: 1800000
+      pool-name: AccountServiceHikariPool
+
+  jpa:
+    hibernate:
+      ddl-auto: update  # Change to 'validate' in production
+    show-sql: false
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.PostgreSQLDialect
+        format_sql: true
+    open-in-view: false
+
+# ========================================
+# SERVER CONFIGURATION
+# ========================================
+server:
+  port: ${ACCOUNT_SERVICE_PORT:8082}
+  servlet:
+    context-path: /
+
+# ========================================
+# EUREKA CLIENT CONFIGURATION
+# ========================================
+eureka:
+  client:
+    service-url:
+      defaultZone: ${EUREKA_URL:http://localhost:8761/eureka/}
+    fetch-registry: true
+    register-with-eureka: true
+    registry-fetch-interval-seconds: 30
+
+  instance:
+    prefer-ip-address: true
+    lease-renewal-interval-in-seconds: 30
+    lease-expiration-duration-in-seconds: 90
+    instance-id: ${spring.application.name}:${server.port}
+    metadata-map:
+      zone: primary
+      version: 1.0.0
+
+# ========================================
+# ACCOUNT SERVICE BUSINESS RULES
+# ========================================
+account:
+  number:
+    prefix: ACC
+    length: 16
+  
+  limits:
+    # Savings Account Limits
+    savings:
+      daily-withdrawal-limit: 500.00
+      daily-transfer-limit: 2000.00
+      interest-rate: 3.5  # Annual percentage
+
+    # Current Account Limits
+    current:
+      daily-withdrawal-limit: 5000.00
+      daily-transfer-limit: 50000.00
+      interest-rate: 0.0
+
+  # Account creation limits per user
+  user-limits:
+    max-savings-accounts: 5
+    max-current-accounts: 1
+
+# ========================================
+# ACTUATOR CONFIGURATION
+# ========================================
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics,prometheus
+      base-path: /actuator
+  endpoint:
+    health:
+      show-details: always
+      probes:
+        enabled: true
+  health:
+    livenessState:
+      enabled: true
+    readinessState:
+      enabled: true
+  metrics:
+    tags:
+      application: ${spring.application.name}
+
+# ========================================
+# LOGGING CONFIGURATION
+# ========================================
+logging:
+  level:
+    root: INFO
+    com.JK.FinIce.accountservice: DEBUG
+    org.springframework.cloud.netflix.eureka: INFO
+    org.hibernate.SQL: DEBUG
+    org.hibernate.type.descriptor.sql.BasicBinder: TRACE
+  file:
+    name: logs/account-service.log

@@ -6,15 +6,19 @@ spring:
     name: eureka-server
 
 server:
-  port: 8761
+  port: ${EUREKA_PORT:8761}
 
 # ========================================
 # EUREKA SERVER SETTINGS
 # ========================================
 eureka:
   instance:
-    hostname: localhost
+    hostname: ${EUREKA_HOSTNAME:localhost}
     prefer-ip-address: false
+    # How often to send heartbeats (seconds)
+    lease-renewal-interval-in-seconds: 10
+    # How long to wait before removing service (seconds)
+    lease-expiration-duration-in-seconds: 30
 
   client:
     # Don't register itself as a client
@@ -24,12 +28,20 @@ eureka:
       defaultZone: http://${eureka.instance.hostname}:${server.port}/eureka/
 
   server:
-    # Disable self-preservation mode in development
+    # Disable self-preservation in development (enable in prod)
     enable-self-preservation: false
-    # Eviction interval (how often to check for down services)
-    eviction-interval-timer-in-ms: 5000
-    # Response cache update interval
-    response-cache-update-interval-ms: 5000
+    # How often to check for expired services (milliseconds)
+    eviction-interval-timer-in-ms: 4000
+    # Response cache update interval (faster = more up-to-date)
+    response-cache-update-interval-ms: 1000
+    response-cache-auto-expiration-in-seconds: 180
+    # Disable peer sync (single server)
+    enable-replicated-request-compression: false
+
+  # Dashboard configuration
+  dashboard:
+    enabled: true
+    path: /
 
 # ========================================
 # ACTUATOR CONFIGURATION
@@ -38,10 +50,15 @@ management:
   endpoints:
     web:
       exposure:
-        include: health,info
+        include: health,info,env,metrics
   endpoint:
     health:
       show-details: always
+  health:
+    diskspace:
+      enabled: true
+    eureka:
+      enabled: true
 
 # ========================================
 # LOGGING CONFIGURATION
@@ -51,8 +68,7 @@ logging:
     root: INFO
     com.netflix.eureka: INFO
     com.netflix.discovery: INFO
-    com:
-      netflix:
-        eureka:
-          registry: WARN
-          resources: WARN
+    com.JK.FinIce.eurekaserver: DEBUG
+    # Reduce Eureka noise
+    com.netflix.eureka.registry: WARN
+    com.netflix.eureka.resources: WARN
