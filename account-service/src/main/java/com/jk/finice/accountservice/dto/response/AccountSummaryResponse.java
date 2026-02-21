@@ -33,6 +33,5 @@ public class AccountSummaryResponse {
      */
     private BigDecimal totalHoldAmount;
 
-    private Currency primaryCurrency;
     private List<AccountResponse> accounts;
 }

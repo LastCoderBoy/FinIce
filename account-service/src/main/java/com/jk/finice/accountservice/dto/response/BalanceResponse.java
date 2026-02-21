@@ -13,7 +13,7 @@ import java.time.LocalDateTime;
 @Builder
 public class BalanceResponse {
 
-    private String accountNumber;
+    private String iban;
 
     /**
      * Total balance in the account

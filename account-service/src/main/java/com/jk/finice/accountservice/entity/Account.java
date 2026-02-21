@@ -14,12 +14,12 @@ import java.time.LocalDateTime;
 @Table(
         name = "accounts",
         indexes = {
-                @Index(name = "idx_account_number", columnList = "account_number"),
+                @Index(name = "idx_iban", columnList = "iban"),
                 @Index(name = "idx_user_id", columnList = "user_id"),
                 @Index(name = "idx_account_type", columnList = "account_type")
         },
         uniqueConstraints = {
-        @UniqueConstraint(name = "uk_account_number", columnNames = "account_number")
+        @UniqueConstraint(name = "uk_iban", columnNames = "iban")
         })
 @Getter
 @Setter
@@ -32,8 +32,8 @@ public class Account {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @Column(name = "account_number", unique = true, nullable = false, length = 16)
-    private String accountNumber;
+    @Column(name = "iban", unique = true, nullable = false, length = 34)
+    private String iban;
 
     // ========== Ownership ==========
 
@@ -48,6 +48,9 @@ public class Account {
 
     @Column(name = "account_nick_name", length = 100)
     private String accountNickName; // Probably will be mostly used on Savings accounts
+
+
+    // ========== Balance Details ==========
 
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 3)
@@ -66,15 +69,9 @@ public class Account {
     @Builder.Default
     private BigDecimal holdAmount = BigDecimal.ZERO; // the money which is in pending transactions
 
-    // ========== Limits & Rules ==========
-
-    @Column(name = "daily_withdrawal_limit", precision = 19, scale = 2)
+    @Column(name = "daily_transaction_limit", precision = 19, scale = 2)
     @Builder.Default
-    private BigDecimal dailyWithdrawalLimit = BigDecimal.valueOf(10000);
-
-    @Column(name = "daily_transfer_limit", precision = 19, scale = 2)
-    @Builder.Default
-    private BigDecimal dailyTransferLimit = BigDecimal.valueOf(10000);
+    private BigDecimal dailyTransactionLimit = BigDecimal.valueOf(10000);
 
 
     // ========== Interest (for Savings/Fixed Deposit) ==========

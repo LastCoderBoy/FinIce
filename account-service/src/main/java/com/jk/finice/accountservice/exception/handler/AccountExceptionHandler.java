@@ -2,9 +2,7 @@ package com.jk.finice.accountservice.exception.handler;
 
 import com.jk.finice.accountservice.exception.AccountCreationFailedException;
 import com.jk.finice.commonlibrary.dto.ApiResponse;
-import com.jk.finice.commonlibrary.exception.InternalServerException;
-import com.jk.finice.commonlibrary.exception.ResourceNotFoundException;
-import com.jk.finice.commonlibrary.exception.ValidationException;
+import com.jk.finice.commonlibrary.exception.*;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -68,6 +66,14 @@ public class AccountExceptionHandler {
                 .body(ApiResponse.error(ex.getMessage()));
     }
 
+    @ExceptionHandler(DatabaseException.class)
+    public ResponseEntity<ApiResponse<Void>> handleDatabaseException(DatabaseException ex) {
+        log.error("[AUTH-EXCEPTION-HANDLER] Database exception: {}", ex.getMessage());
+
+        return ResponseEntity
+                .status(HttpStatus.INTERNAL_SERVER_ERROR)
+                .body(ApiResponse.error(ex.getMessage()));
+    }
 
     /**
      * Handle validation exception
@@ -78,6 +84,15 @@ public class AccountExceptionHandler {
 
         return ResponseEntity
                 .status(HttpStatus.BAD_REQUEST)
+                .body(ApiResponse.error(ex.getMessage()));
+    }
+
+    @ExceptionHandler(UnauthorizedException.class)
+    public ResponseEntity<ApiResponse<Void>> handleUnauthorizedException(UnauthorizedException ex) {
+        log.error("[AUTH-EXCEPTION-HANDLER] Unauthorized exception: {}", ex.getMessage());
+
+        return ResponseEntity
+                .status(HttpStatus.UNAUTHORIZED)
                 .body(ApiResponse.error(ex.getMessage()));
     }
 

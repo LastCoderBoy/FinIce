@@ -1,6 +1,11 @@
 # ========================================
 # ACCOUNT SERVICE CONFIGURATION
 # ========================================
+bank:
+  code: ${BANK_CODE:1001}
+country:
+  code: ${COUNTRY_CODE:UZ}
+
 spring:
   application:
     name: account-service
@@ -9,9 +14,9 @@ spring:
   # DATABASE CONFIGURATION
   # ========================================
   datasource:
-    url: ${ACCOUNT_DB_URL:jdbc:postgresql://localhost:5432/finice_accounts}
-    username: ${ACCOUNT_DB_USER:postgres}
-    password: ${ACCOUNT_DB_PASSWORD:postgres}
+    url: jdbc:postgresql://${DB_HOST}:${DB_PORT}/${ACCOUNT_DB_NAME}
+    username: ${DB_USER}
+    password: ${DB_PASSWORD}
     driver-class-name: org.postgresql.Driver
 
     hikari:

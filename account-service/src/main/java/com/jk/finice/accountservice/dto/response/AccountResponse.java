@@ -18,7 +18,7 @@ import java.time.LocalDateTime;
 public class AccountResponse {
 
     private Long id;
-    private String accountNumber;
+    private String iban;
     private AccountType accountType;
     private Currency currency;
 
@@ -28,8 +28,7 @@ public class AccountResponse {
     private BigDecimal holdAmount;
 
     // Limits
-    private BigDecimal dailyWithdrawalLimit;
-    private BigDecimal dailyTransferLimit;
+    private BigDecimal dailyTransactionLimit;
 
     // Interest (for savings accounts)
     private BigDecimal interestRate;
@@ -42,14 +41,13 @@ public class AccountResponse {
 
     public AccountResponse(Account account) {
         this.id = account.getId();
-        this.accountNumber = account.getAccountNumber();
+        this.iban = account.getIban();
         this.accountType = account.getAccountType();
         this.currency = account.getCurrency();
         this.balance = account.getBalance();
         this.availableBalance = account.getAvailableBalance();
         this.holdAmount = account.getHoldAmount();
-        this.dailyWithdrawalLimit = account.getDailyWithdrawalLimit();
-        this.dailyTransferLimit = account.getDailyTransferLimit();
+        this.dailyTransactionLimit = account.getDailyTransactionLimit();
         this.interestRate = account.getInterestRate();
         this.lastInterestCalculatedAt = account.getLastInterestCalculatedAt();
         this.nickname = account.getAccountNickName();
