@@ -1,5 +1,6 @@
 package com.jk.finice.apigateway.config;
 
+import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -8,6 +9,7 @@ import org.springframework.web.cors.reactive.CorsWebFilter;
 import org.springframework.web.cors.reactive.UrlBasedCorsConfigurationSource;
 
 import java.util.Arrays;
+import java.util.List;
 
 import static com.jk.finice.commonlibrary.constants.AppConstants.*;
 /**
@@ -15,32 +17,26 @@ import static com.jk.finice.commonlibrary.constants.AppConstants.*;
  * preventing unauthorized cross-origin requests while allowing legitimate ones.
  * */
 @Configuration
+@RequiredArgsConstructor
 public class CorsConfig {
 
-    @Value("${spring.cloud.gateway.globalcors.cors-configurations.[/**].allowed-origins}")
-    private String[] allowedOrigins;
-
-    @Value("${spring.cloud.gateway.globalcors.cors-configurations.[/**].allowed-methods}")
-    private String[] allowedMethods;
-
-    @Value("${spring.cloud.gateway.globalcors.cors-configurations.[/**].allow-credentials}")
-    private boolean allowCredentials;
+    private final AppProperties appProperties;
 
     @Bean
     public CorsWebFilter corsFilter() {
-        CorsConfiguration corsConfiguration = new CorsConfiguration();
+        CorsConfiguration corsConfig = new CorsConfiguration();
 
-        corsConfiguration.setAllowedOrigins(Arrays.asList(allowedOrigins));
-        corsConfiguration.setAllowedMethods(Arrays.asList(allowedMethods));
-        corsConfiguration.setAllowCredentials(allowCredentials);
-        corsConfiguration.setAllowedHeaders(Arrays.asList("*"));
-        corsConfiguration.setMaxAge(3600L); // caching for 1 hour
+        corsConfig.setAllowedOrigins(appProperties.getCors().getAllowedOrigins());
+        corsConfig.setAllowedMethods(appProperties.getCors().getAllowedMethods());
+        corsConfig.setAllowedHeaders(List.of("*"));
+        corsConfig.setAllowCredentials(appProperties.getCors().isAllowCredentials());
+        corsConfig.setMaxAge(appProperties.getCors().getMaxAge());
 
-        corsConfiguration.setAllowedHeaders(
+        corsConfig.setAllowedHeaders(
                 Arrays.asList(USER_ROLES_HEADER, AUTHORIZATION_HEADER, USER_ID_HEADER, "Content-Type"));
 
         UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
-        source.registerCorsConfiguration("/**", corsConfiguration);
+        source.registerCorsConfiguration("/**", corsConfig);
 
         return new CorsWebFilter(source);
     }

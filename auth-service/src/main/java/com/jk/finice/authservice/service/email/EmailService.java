@@ -43,7 +43,7 @@ public class EmailService {
     @Value("${email.verification.url}")
     private String emailVerificationUrl;
 
-    @Value("${app.name}")
+    @Value("${spring.application.name}")
     private String appName;
 
     @Async("taskExecutor")
