@@ -26,7 +26,6 @@ import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.scheduling.annotation.Async;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.security.authentication.DisabledException;
@@ -35,7 +34,6 @@ import org.springframework.security.core.Authentication;
 import org.springframework.security.core.AuthenticationException;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
@@ -132,13 +130,22 @@ public class AuthenticationServiceImpl implements AuthenticationService {
     @Override
     @Transactional(readOnly = true)
     public UserResponse getProfile(UserPrincipal principal) {
-        User user = userRepository.findById(principal.getId())
-                .orElseThrow(() -> {
-                    log.error("[AUTH-SERVICE] User not found with ID: {}", principal.getId());
-                    return new ResourceNotFoundException("User not found with ID: " + principal.getId());
-        });
+        // Check cache first (Cache-Aside pattern)
+        UserResponse cachedUserProfile = redisService.getCachedUserProfile(principal.getId());
+        if(cachedUserProfile != null){
+            log.debug("[AUTH-SERVICE] User profile retrieved from Cache for user: {}", principal.getUsername());
+            return cachedUserProfile;
+        }
 
-        return mapToUserResponse(user);
+        User user = userRepository.findById(principal.getId())
+                .orElseThrow(() -> new ResourceNotFoundException("User not found with ID: " + principal.getId()));
+
+        UserResponse userResponse = mapToUserResponse(user);
+
+        // Cache for future requests
+        redisService.cacheUserProfile(user.getId(), userResponse);
+
+        return userResponse;
     }
 
     // No need Transactional
@@ -179,6 +186,9 @@ public class AuthenticationServiceImpl implements AuthenticationService {
             );
 
             cookiesManager.setRefreshTokenCookie(response, refreshToken.getToken());
+
+            // Cache user profile after successful login
+            redisService.cacheUserProfile(user.getId(), mapToUserResponse(user));
 
             return mapToAuthResponse(user, accessToken);
 
@@ -277,14 +287,17 @@ public class AuthenticationServiceImpl implements AuthenticationService {
             if(!updateUserRequest.isAtLeastOneFieldProvided()){
                 throw new ValidationException("At least one field must be provided for update");
             }
-            User userEntity = findUserById(principal.getId());
+            User user = findUserById(principal.getId());
 
-            populateEntityWithLatestData(userEntity, updateUserRequest);
+            populateEntityWithLatestData(user, updateUserRequest);
 
-            User updatedUser = userRepository.save(userEntity);
+            user = userRepository.save(user);
             log.info("[AUTH-SERVICE] User profile updated successfully for user: {}", principal.getUsername());
 
-            return mapToUserResponse(updatedUser);
+            // Invalidate and refresh cache after update
+            redisService.refreshUserProfile(user.getId(), mapToUserResponse(user));
+
+            return mapToUserResponse(user);
 
         } catch (DuplicateResourceFoundException | ValidationException de){
             throw de;

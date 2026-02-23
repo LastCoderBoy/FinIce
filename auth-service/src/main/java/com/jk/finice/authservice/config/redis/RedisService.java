@@ -1,5 +1,8 @@
 package com.jk.finice.authservice.config.redis;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.jk.finice.authservice.dto.UserResponse;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.redis.core.RedisTemplate;
@@ -7,7 +10,7 @@ import org.springframework.stereotype.Service;
 
 import java.util.concurrent.TimeUnit;
 
-import static com.jk.finice.commonlibrary.constants.AppConstants.CACHE_TOKEN_BLACKLIST_PREFIX;
+import static com.jk.finice.commonlibrary.constants.AppConstants.*;
 
 @Service
 @RequiredArgsConstructor
@@ -15,6 +18,7 @@ import static com.jk.finice.commonlibrary.constants.AppConstants.CACHE_TOKEN_BLA
 public class RedisService {
 
     private final RedisTemplate<String, String> redisTemplate;
+    private final ObjectMapper objectMapper;
 
     /**
      * Add token to blacklist
@@ -93,4 +97,86 @@ public class RedisService {
             return -1;
         }
     }
+
+
+    // ========================================
+    // USER PROFILE CACHING
+    // ========================================
+
+    /**
+     * Cache user profile
+     * TTL: 30 minutes (configurable)
+     *
+     * @param userId User ID
+     * @param userResponse User profile data
+     */
+    public void cacheUserProfile(Long userId, UserResponse userResponse) {
+        try{
+            String key = CACHE_USER_PROFILE_PREFIX + userId;
+            String jsonValue = objectMapper.writeValueAsString(userResponse);
+            redisTemplate.opsForValue().set(key, jsonValue, CACHE_USER_PROFILE_TTL, TimeUnit.MINUTES);
+
+            log.info("[REDIS-SERVICE] Cached user profile for user ID: {}", userId);
+
+        } catch (JsonProcessingException e) {
+            log.error("[REDIS-SERVICE] Failed to serialize user profile: {}", e.getMessage(), e);
+        } catch (Exception e) {
+            log.error("[REDIS-SERVICE] Failed to cache user profile: {}", e.getMessage(), e);
+        }
+    }
+
+    /**
+     * Get cached user profile
+     *
+     * @param userId User ID
+     * @return UserResponse if cached, null if not found or error
+     */
+    public UserResponse getCachedUserProfile(Long userId) {
+        try{
+            String key = CACHE_USER_PROFILE_PREFIX + userId;
+            String jsonValue = redisTemplate.opsForValue().get(key);
+            if(jsonValue != null){
+                log.info("[REDIS-SERVICE] Retrieved cached user profile for user ID: {}", userId);
+                return objectMapper.readValue(jsonValue, UserResponse.class);
+            }
+
+            log.debug("[REDIS-SERVICE] Cache MISS for user: {}", userId);
+            return null;
+        } catch (JsonProcessingException je){
+            log.error("[REDIS-SERVICE] Failed to deserialize user profile: {}", je.getMessage(), je);
+            return null;
+        } catch (Exception e) {
+            log.error("[REDIS-SERVICE] Failed to get cached user profile: {}", e.getMessage(), e);
+            return null; // Fail-safe: fetch from DB
+        }
+    }
+
+    /**
+     * Invalidate user profile cache
+     * Call this when user data changes (update, role change, etc.)
+     *
+     * @param userId User ID
+     */
+    public void invalidateUserProfile(Long userId) {
+        try {
+            String key = CACHE_USER_PROFILE_PREFIX + userId;
+            redisTemplate.delete(key);
+            log.info("[REDIS-SERVICE] Invalidated user profile cache for user: {}", userId);
+        } catch (Exception e) {
+            log.error("[REDIS-SERVICE] Failed to invalidate user profile: {}", e.getMessage());
+        }
+    }
+
+    /**
+     * Refresh user profile cache
+     * Update existing cache with new data
+     *
+     * @param userId User ID
+     * @param userResponse Updated user profile
+     */
+    public void refreshUserProfile(Long userId, UserResponse userResponse) {
+        invalidateUserProfile(userId); // Clear old cache
+        cacheUserProfile(userId, userResponse); // Set the new cache
+    }
+
 }

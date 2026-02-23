@@ -77,17 +77,17 @@ public final class AppConstants {
 
 
     // ========== Cache Keys ==========
-    public static final String CACHE_USER_PREFIX = "user:";
-    public static final String CACHE_TOKEN_BLACKLIST_PREFIX = "blacklist:token:";
-    public static final String CACHE_REFRESH_TOKEN_PREFIX = "refresh:token:";
-    public static final String CACHE_OTP_PREFIX = "otp:";
+    public static final String CACHE_USER_PROFILE_PREFIX = "auth:user:profile:";
+    public static final String CACHE_TOKEN_BLACKLIST_PREFIX = "auth:blacklist:token:";
+    public static final String CACHE_REFRESH_TOKEN_PREFIX = "auth:refresh:token:";
+    public static final String CACHE_OTP_PREFIX = "auth:otp:";
     public static final String CACHE_SESSION_PREFIX = "session:";
 
     // ========== Cache TTL (in seconds) ==========
-    public static final long CACHE_USER_TTL = 3600; // 1 hour
-    public static final long CACHE_TOKEN_BLACKLIST_TTL = 86400; // 24 hours
-    public static final long CACHE_OTP_TTL = 300; // 5 minutes
-    public static final long CACHE_SESSION_TTL = 1800; // 30 minutes
+    public static final long CACHE_USER_PROFILE_TTL = 30;      // 30 minutes
+    public static final long CACHE_REFRESH_TOKEN_TTL = 10080;  // 7 days
+    public static final long CACHE_EMAIL_TOKEN_TTL = 1440;     // 24 hours
+    public static final long CACHE_OTP_TTL = 5;                // 5 minutes
 
     // ========== Pagination ==========
     public static final int DEFAULT_PAGE_SIZE = 20;
