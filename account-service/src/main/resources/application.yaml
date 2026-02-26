@@ -1,11 +1,6 @@
 # ========================================
 # ACCOUNT SERVICE CONFIGURATION
 # ========================================
-bank:
-  code: ${BANK_CODE:1001}
-country:
-  code: ${COUNTRY_CODE:UZ}
-
 spring:
   application:
     name: account-service
@@ -69,27 +64,23 @@ eureka:
 # ACCOUNT SERVICE BUSINESS RULES
 # ========================================
 account:
-  number:
-    prefix: ACC
-    length: 16
-  
+  bank:
+    code: ${BANK_CODE}
+  country:
+    code: ${COUNTRY_CODE}
+
   limits:
-    # Savings Account Limits
     savings:
-      daily-withdrawal-limit: 500.00
-      daily-transfer-limit: 2000.00
-      interest-rate: 3.5  # Annual percentage
-
-    # Current Account Limits
-    current:
+      max-accounts-per-user: 5
       daily-withdrawal-limit: 5000.00
-      daily-transfer-limit: 50000.00
-      interest-rate: 0.0
+      daily-transfer-limit: 20000.00
+      interest-rate: 3.5
 
-  # Account creation limits per user
-  user-limits:
-    max-savings-accounts: 5
-    max-current-accounts: 1
+    current:
+      max-accounts-per-user: 1
+      daily-withdrawal-limit: 50000.00
+      daily-transfer-limit: 500000.00
+      interest-rate: 0.0
 
 # ========================================
 # ACTUATOR CONFIGURATION

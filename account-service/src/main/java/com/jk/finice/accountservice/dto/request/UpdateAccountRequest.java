@@ -14,9 +14,13 @@ import java.math.BigDecimal;
 @Builder
 public class UpdateAccountRequest {
 
-    @DecimalMin(value = "0.00", message = "Daily transaction limit must be positive")
+    @DecimalMin(value = "0.00", message = "Transfer limit must be positive")
     @Digits(integer = 17, fraction = 2, message = "Invalid amount format")
-    private BigDecimal dailyTransactionLimit;
+    private BigDecimal dailyTransferLimit;
+
+    @DecimalMin(value = "0.00", message = "Withdrawal limit must be positive")
+    @Digits(integer = 17, fraction = 2, message = "Invalid amount format")
+    private BigDecimal dailyWithdrawalLimit;
 
     @Size(max = 100, message = "Nickname must not exceed 100 characters")
     private String nickname;

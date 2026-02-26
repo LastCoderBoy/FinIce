@@ -27,4 +27,6 @@ public interface AccountRepository extends JpaRepository<Account, Long> {
     // Find all accounts for user
     @Query("SELECT a FROM Account a WHERE a.userId = :userId ORDER BY a.createdAt DESC")
     List<Account> findAllByUserId(Long userId);
+
+    Optional<Account> findByIdAndUserId(Long userId, Long accountId);
 }

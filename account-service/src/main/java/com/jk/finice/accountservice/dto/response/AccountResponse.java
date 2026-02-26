@@ -28,7 +28,8 @@ public class AccountResponse {
     private BigDecimal holdAmount;
 
     // Limits
-    private BigDecimal dailyTransactionLimit;
+    private BigDecimal dailyTransferLimit;
+    private BigDecimal dailyWithdrawalLimit;
 
     // Interest (for savings accounts)
     private BigDecimal interestRate;
@@ -47,7 +48,8 @@ public class AccountResponse {
         this.balance = account.getBalance();
         this.availableBalance = account.getAvailableBalance();
         this.holdAmount = account.getHoldAmount();
-        this.dailyTransactionLimit = account.getDailyTransactionLimit();
+        this.dailyTransferLimit = account.getDailyTransferLimit();
+        this.dailyWithdrawalLimit = account.getDailyWithdrawalLimit();
         this.interestRate = account.getInterestRate();
         this.lastInterestCalculatedAt = account.getLastInterestCalculatedAt();
         this.nickname = account.getAccountNickName();

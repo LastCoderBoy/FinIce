@@ -1,18 +1,19 @@
 package com.jk.finice.accountservice.service.impl;
 
+import com.jk.finice.accountservice.config.AccountProperties;
 import com.jk.finice.accountservice.dto.request.CreateAccountRequest;
+import com.jk.finice.accountservice.dto.request.UpdateAccountRequest;
 import com.jk.finice.accountservice.dto.response.AccountResponse;
+import com.jk.finice.accountservice.dto.response.AccountSettingsResponse;
 import com.jk.finice.accountservice.dto.response.AccountSummaryResponse;
+import com.jk.finice.accountservice.dto.response.BalanceResponse;
 import com.jk.finice.accountservice.entity.Account;
 import com.jk.finice.accountservice.enums.AccountType;
 import com.jk.finice.accountservice.exception.AccountCreationFailedException;
 import com.jk.finice.accountservice.repository.AccountRepository;
 import com.jk.finice.accountservice.service.AccountService;
 import com.jk.finice.accountservice.util.MaskingUtils;
-import com.jk.finice.commonlibrary.exception.DatabaseException;
-import com.jk.finice.commonlibrary.exception.InternalServerException;
-import com.jk.finice.commonlibrary.exception.ResourceNotFoundException;
-import com.jk.finice.commonlibrary.exception.UnauthorizedException;
+import com.jk.finice.commonlibrary.exception.*;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
@@ -22,7 +23,9 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.math.BigInteger;
+import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Optional;
 import java.util.concurrent.ThreadLocalRandom;
 
 @Service
@@ -30,12 +33,7 @@ import java.util.concurrent.ThreadLocalRandom;
 @RequiredArgsConstructor
 public class AccountServiceImpl implements AccountService {
 
-    @Value("${bank.code}")
-    private String BANK_CODE;
-
-    @Value("${country.code}")
-    private String COUNTRY_CODE;
-
+    private final AccountProperties accountProperties;
     private final AccountRepository accountRepository;
 
 
@@ -45,109 +43,129 @@ public class AccountServiceImpl implements AccountService {
     @Transactional(rollbackFor = Exception.class)
     @Override
     public AccountResponse createAccount(CreateAccountRequest createRequest, Long userId) {
-        try {
+        String iban = generateIban();
 
-            String iban = generateIban();
-
-            if(isAccountTypeValid(createRequest.getAccountType(), userId)){
-                Account account = Account.builder()
-                        .iban(iban)
-                        .userId(userId)
-                        .accountType(createRequest.getAccountType())
-                        .currency(createRequest.getCurrency())
-                        .balance(createRequest.getInitialDeposit())
-                        .availableBalance(createRequest.getInitialDeposit()) // Since the account is newly created
-                        .accountNickName(createRequest.getNickName())
-                        .build();
-
-                accountRepository.save(account);
-                accountRepository.flush(); // Populate the timestamps
-
-
-                log.info("[ACCOUNT-SERVICE] Created account for user: {} with account number: **** {}",
-                        userId,
-                        MaskingUtils.maskIban(iban));
-                return new AccountResponse(account);
-            }
-
-            throw new AccountCreationFailedException("Cannot create anymore accounts of " + createRequest.getAccountType() + " type.");
-
-        } catch (AccountCreationFailedException ace) {
-            throw ace;
-        } catch (Exception e) {
-            log.error("[ACCOUNT-SERVICE] Failed to create account for user: {}", userId, e);
-            throw new InternalServerException("Failed to create account");
+        if (!isAccountTypeValid(createRequest.getAccountType(), userId)) {
+            throw new AccountCreationFailedException(
+                    "Cannot create anymore accounts of " + createRequest.getAccountType() + " type."
+            );
         }
+
+        Account account = Account.builder()
+                .iban(iban)
+                .userId(userId)
+                .accountType(createRequest.getAccountType())
+                .currency(createRequest.getCurrency())
+                .balance(createRequest.getInitialDeposit())
+                .availableBalance(createRequest.getInitialDeposit())
+                .accountNickName(createRequest.getNickName())
+                .build();
+
+        accountRepository.save(account);
+        accountRepository.flush();
+
+        log.info("[ACCOUNT-SERVICE] Created account for user: {} with IBAN: ****{}",
+                userId,
+                MaskingUtils.maskIban(iban));
+
+        return new AccountResponse(account);
     }
 
     @Transactional(readOnly = true)
     @Override
     public AccountResponse viewAccountDetails(Long accountId, Long userId) {
-        try{
-            Account account = accountRepository.findById(accountId)
-                    .orElseThrow(() -> new ResourceNotFoundException("Account not found with ID: " + accountId));
+        Account account = getAccountWithOwnership(accountId, userId);
+        return new AccountResponse(account);
+    }
 
-            if(!account.getUserId().equals(userId)){
-                throw new UnauthorizedException("You are not authorized to view this account.");
-            }
+    @Transactional(readOnly = true)
+    @Override
+    public BalanceResponse fetchBalance(Long accountId, Long userId){
+        Account account = getAccountWithOwnership(accountId, userId);
 
-            return new AccountResponse(account);
-
-        } catch (ResourceNotFoundException | UnauthorizedException ex){
-            throw ex;
-        } catch (DataIntegrityViolationException de){
-            log.error("[ACCOUNT-SERVICE] Failed to view account details for account ID: {}", accountId, de);
-            throw new DatabaseException("Failed to view account details");
-        }
-        catch (Exception e){
-            log.error("[ACCOUNT-SERVICE] Failed to view account details for account ID: {}", accountId, e);
-            throw new InternalServerException("Failed to view account details");
-        }
+        return BalanceResponse.builder()
+                .iban(MaskingUtils.maskIban(account.getIban()))
+                .balance(account.getBalance())
+                .availableBalance(account.getAvailableBalance())
+                .holdAmount(account.getHoldAmount())
+                .currency(account.getCurrency())
+                .asOfTime(LocalDateTime.now())
+                .build();
     }
 
     @Transactional(readOnly = true)
     @Override
     public AccountSummaryResponse getAccountSummary(Long userId) {
-        try{
-            List<Account> allAccounts = accountRepository.findAllByUserId(userId);
+        List<Account> allAccounts = accountRepository.findAllByUserId(userId);
 
-            int totalSavings = 0, totalCurrent = 0;
-            BigDecimal totalBalance = BigDecimal.ZERO,
-                    totalAvailableBalance = BigDecimal.ZERO,
-                    totalHoldAmount = BigDecimal.ZERO;
+        int totalSavings = 0, totalCurrent = 0;
+        BigDecimal totalBalance = BigDecimal.ZERO,
+                totalAvailableBalance = BigDecimal.ZERO,
+                totalHoldAmount = BigDecimal.ZERO;
 
-            for(Account account : allAccounts){
-                switch (account.getAccountType()){
-                    case CURRENT:
-                        totalCurrent++;
-                        break;
-                    case SAVINGS:
-                        totalSavings++;
-                        break;
-                }
-                totalBalance = totalBalance.add(account.getBalance());
-                totalAvailableBalance = totalAvailableBalance.add(account.getAvailableBalance());
-                totalHoldAmount = totalHoldAmount.add(account.getHoldAmount());
+        for(Account account : allAccounts){
+            switch (account.getAccountType()){
+                case CURRENT:
+                    totalCurrent++;
+                    break;
+                case SAVINGS:
+                    totalSavings++;
+                    break;
             }
-
-            List<AccountResponse> listOfAccountDto = allAccounts.stream()
-                    .map(AccountResponse::new)
-                    .toList();
-
-            return AccountSummaryResponse.builder()
-                    .totalAccounts(allAccounts.size())
-                    .savingsAccounts(totalSavings)
-                    .currentAccounts(totalCurrent)
-                    .totalBalance(totalBalance)
-                    .totalAvailableBalance(totalAvailableBalance)
-                    .totalHoldAmount(totalHoldAmount)
-                    .accounts(listOfAccountDto)
-                    .build();
-
-        } catch (Exception e){
-            log.error("[ACCOUNT-SERVICE] Failed to get account summary for user ID: {}", userId, e);
-            throw new InternalServerException("Failed to get account summary");
+            totalBalance = totalBalance.add(account.getBalance());
+            totalAvailableBalance = totalAvailableBalance.add(account.getAvailableBalance());
+            totalHoldAmount = totalHoldAmount.add(account.getHoldAmount());
         }
+
+        List<AccountResponse> listOfAccountDto = allAccounts.stream()
+                .map(AccountResponse::new)
+                .toList();
+
+        return AccountSummaryResponse.builder()
+                .totalAccounts(allAccounts.size())
+                .savingsAccounts(totalSavings)
+                .currentAccounts(totalCurrent)
+                .totalBalance(totalBalance)
+                .totalAvailableBalance(totalAvailableBalance)
+                .totalHoldAmount(totalHoldAmount)
+                .accounts(listOfAccountDto)
+                .build();
+    }
+
+    @Transactional
+    @Override
+    public AccountSettingsResponse updateAccountSetting(UpdateAccountRequest updateRequest, Long accountId, Long userId){
+        Account account = getAccountWithOwnership(accountId, userId);
+
+        // Validate at least one field provided
+        if (updateRequest.getDailyWithdrawalLimit() != null) {
+            validateWithdrawalLimit(account.getAccountType(), updateRequest.getDailyWithdrawalLimit());
+            account.setDailyWithdrawalLimit(updateRequest.getDailyWithdrawalLimit());
+        }
+
+        if (updateRequest.getDailyTransferLimit() != null) {
+            validateTransferLimit(account.getAccountType(), updateRequest.getDailyTransferLimit());
+            account.setDailyTransferLimit(updateRequest.getDailyTransferLimit());
+        }
+
+
+        if(updateRequest.getNickname() != null){
+            String trimmedNickname = updateRequest.getNickname().trim();
+            if(!trimmedNickname.isEmpty()){
+                account.setAccountNickName(updateRequest.getNickname());
+            }
+        }
+
+        accountRepository.save(account);
+        log.info("[ACCOUNT-SERVICE] Updated account settings for user: {} with account number: **** {}",
+                userId, MaskingUtils.maskIban(account.getIban()));
+
+        return AccountSettingsResponse.builder()
+                .accountNickname(account.getAccountNickName())
+                .dailyWithdrawalLimit(account.getDailyWithdrawalLimit())
+                .dailyTransferLimit(account.getDailyTransferLimit())
+                .updatedAt(account.getUpdatedAt())
+                .build();
     }
 
 
@@ -177,13 +195,15 @@ public class AccountServiceImpl implements AccountService {
         String iban;
         int maxAttempts = 5;
         int attempt = 0;
+        String bankCode = accountProperties.getBank().getCode();
+        String countryCode = accountProperties.getCountry().getCode();
 
         do {
             String accountNumber = generateAccountNumber();
-            String bban = BANK_CODE + accountNumber;
-            String checkDigit = generateCheckDigit(bban);
+            String bban = bankCode + accountNumber;
+            String checkDigit = generateCheckDigit(bban, countryCode);
 
-            iban = COUNTRY_CODE + checkDigit + bban ;
+            iban = countryCode + checkDigit + bban ;
             attempt++;
         } while (ibanExists(iban) && attempt < maxAttempts);
 
@@ -194,8 +214,8 @@ public class AccountServiceImpl implements AccountService {
         return iban;
     }
 
-    private String generateCheckDigit(String bban) {
-        String rearrangedIban = bban + COUNTRY_CODE + "00";
+    private String generateCheckDigit(String bban, String countryCode) {
+        String rearrangedIban = bban + countryCode + "00";
 
         // Convert letters to numbers (A=10, B=11, ... P=25, L=21 ... Z=35)
         StringBuilder numericString = new StringBuilder();
@@ -229,5 +249,57 @@ public class AccountServiceImpl implements AccountService {
 
     private boolean ibanExists(String iban) {
         return accountRepository.existsByIban(iban);
+    }
+
+    private Account getAccountWithOwnership(Long accountId, Long userId) {
+        Account account = accountRepository.findById(accountId)
+                .orElseThrow(() -> new ResourceNotFoundException("Account not found with ID: " + accountId));
+
+        if (!account.getUserId().equals(userId)) {
+            log.warn("[ACCOUNT-SERVICE] User {} attempted unauthorized access to account {} (owner: {})",
+                    userId, accountId, account.getUserId());
+            throw new UnauthorizedException("You are not authorized to access this account");
+        }
+
+        return account;
+    }
+
+
+
+    private void validateWithdrawalLimit(AccountType accountType, BigDecimal requestedLimit) {
+        BigDecimal maxLimit = getMaxWithdrawalLimit(accountType);
+
+        if (requestedLimit.compareTo(maxLimit) > 0) {
+            throw new ValidationException(
+                    String.format("Withdrawal limit cannot exceed %s for %s account (requested: %s)",
+                            maxLimit, accountType, requestedLimit));
+        }
+    }
+
+    /**
+     * Validate transfer limit
+     */
+    private void validateTransferLimit(AccountType accountType, BigDecimal requestedLimit) {
+        BigDecimal maxLimit = getMaxTransferLimit(accountType);
+
+        if (requestedLimit.compareTo(maxLimit) > 0) {
+            throw new ValidationException(
+                    String.format("Transfer limit cannot exceed %s for %s account (requested: %s)",
+                            maxLimit, accountType, requestedLimit));
+        }
+    }
+
+    private BigDecimal getMaxTransferLimit(AccountType accountType) {
+        return switch (accountType) {
+            case SAVINGS -> accountProperties.getLimits().getSavings().getDailyTransferLimit();
+            case CURRENT -> accountProperties.getLimits().getCurrent().getDailyTransferLimit();
+        };
+    }
+
+    private BigDecimal getMaxWithdrawalLimit(AccountType accountType) {
+        return switch (accountType) {
+            case SAVINGS -> accountProperties.getLimits().getSavings().getDailyWithdrawalLimit();
+            case CURRENT -> accountProperties.getLimits().getCurrent().getDailyWithdrawalLimit();
+        };
     }
 }

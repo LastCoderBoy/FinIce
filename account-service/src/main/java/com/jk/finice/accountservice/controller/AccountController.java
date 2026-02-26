@@ -1,8 +1,11 @@
 package com.jk.finice.accountservice.controller;
 
 import com.jk.finice.accountservice.dto.request.CreateAccountRequest;
+import com.jk.finice.accountservice.dto.request.UpdateAccountRequest;
 import com.jk.finice.accountservice.dto.response.AccountResponse;
+import com.jk.finice.accountservice.dto.response.AccountSettingsResponse;
 import com.jk.finice.accountservice.dto.response.AccountSummaryResponse;
+import com.jk.finice.accountservice.dto.response.BalanceResponse;
 import com.jk.finice.accountservice.service.AccountService;
 import com.jk.finice.commonlibrary.dto.ApiResponse;
 import jakarta.validation.Valid;
@@ -49,6 +52,19 @@ public class AccountController {
         );
     }
 
+    @GetMapping("/{accountId}/balance")
+    public ResponseEntity<ApiResponse<BalanceResponse>> fetchBalance(@PathVariable Long accountId,
+                                                                     @RequestHeader(USER_ID_HEADER) Long userId){
+
+        log.info("[ACCOUNT-CONTROLLER] Fetching balance for account ID: {}", accountId);
+
+        BalanceResponse balanceResponse = accountService.fetchBalance(accountId, userId);
+
+        return ResponseEntity.ok(
+                ApiResponse.success("Balance retrieved successfully", balanceResponse)
+        );
+    }
+
     @GetMapping("/summary")
     public ResponseEntity<ApiResponse<AccountSummaryResponse>> getAccountSummary(@RequestHeader(USER_ID_HEADER) Long userId){
         log.info("[ACCOUNT-CONTROLLER] Getting account summary for user ID: {}", userId);
@@ -57,6 +73,19 @@ public class AccountController {
 
         return ResponseEntity.ok(
                 ApiResponse.success("Account summary retrieved successfully", summaryResponse)
+        );
+    }
+
+    @PatchMapping("/{accountId}/settings")
+    public ResponseEntity<ApiResponse<AccountSettingsResponse>> updateAccountSetting(@Valid @RequestBody UpdateAccountRequest updateRequest,
+                                                                                     @PathVariable Long accountId,
+                                                                                     @RequestHeader(USER_ID_HEADER) Long userId){
+        log.info("[ACCOUNT-CONTROLLER] Updating account settings for account ID: {}", accountId);
+
+        AccountSettingsResponse settingsResponse = accountService.updateAccountSetting(updateRequest, accountId, userId);
+
+        return ResponseEntity.ok(
+                ApiResponse.success("Account settings updated successfully", settingsResponse)
         );
     }
 }

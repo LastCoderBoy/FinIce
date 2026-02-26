@@ -53,7 +53,7 @@ public class AccountExceptionHandler {
         log.error("[ACCOUNT-EXCEPTION-HANDLER] Account creation failed: {}", ex.getMessage());
 
         return ResponseEntity
-                .status(HttpStatus.INTERNAL_SERVER_ERROR)
+                .status(HttpStatus.BAD_REQUEST)
                 .body(ApiResponse.error(ex.getMessage()));
     }
 

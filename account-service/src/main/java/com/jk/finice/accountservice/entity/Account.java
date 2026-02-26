@@ -69,9 +69,15 @@ public class Account {
     @Builder.Default
     private BigDecimal holdAmount = BigDecimal.ZERO; // the money which is in pending transactions
 
-    @Column(name = "daily_transaction_limit", precision = 19, scale = 2)
+    // ========== Limits ==========
+
+    @Column(name = "daily_withdrawal_limit", precision = 19, scale = 2)
     @Builder.Default
-    private BigDecimal dailyTransactionLimit = BigDecimal.valueOf(10000);
+    private BigDecimal dailyWithdrawalLimit = BigDecimal.ZERO;
+
+    @Column(name = "daily_transfer_limit", precision = 19, scale = 2)
+    @Builder.Default
+    private BigDecimal dailyTransferLimit = BigDecimal.ZERO;
 
 
     // ========== Interest (for Savings/Fixed Deposit) ==========

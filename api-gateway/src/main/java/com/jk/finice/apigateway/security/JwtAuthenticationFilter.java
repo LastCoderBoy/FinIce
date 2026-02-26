@@ -65,7 +65,7 @@ public class JwtAuthenticationFilter extends AbstractGatewayFilterFactory<JwtAut
 
                 if (!jwtProvider.validateToken(token)) {
                     log.warn("[JWT-AUTH-FILTER] Invalid JWT token for path: {}", path);
-                    return onError(exchange, config.getUnauthorizedMessage(), HttpStatus.UNAUTHORIZED);
+                    return onError(exchange, "Token has expired or has invalid structure", HttpStatus.UNAUTHORIZED);
                 }
 
                 // Check if token is blacklisted in Redis Cache
