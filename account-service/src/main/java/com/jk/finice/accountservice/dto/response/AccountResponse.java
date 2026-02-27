@@ -1,6 +1,7 @@
 package com.jk.finice.accountservice.dto.response;
 
 import com.jk.finice.accountservice.entity.Account;
+import com.jk.finice.accountservice.enums.AccountStatus;
 import com.jk.finice.accountservice.enums.AccountType;
 import com.jk.finice.accountservice.enums.Currency;
 import com.fasterxml.jackson.annotation.JsonInclude;
@@ -27,6 +28,11 @@ public class AccountResponse {
     private BigDecimal availableBalance;
     private BigDecimal holdAmount;
 
+    // Account Status
+    private AccountStatus status;
+    private LocalDateTime closedAt;
+    private String closedReason;
+
     // Limits
     private BigDecimal dailyTransferLimit;
     private BigDecimal dailyWithdrawalLimit;
@@ -45,6 +51,9 @@ public class AccountResponse {
         this.iban = account.getIban();
         this.accountType = account.getAccountType();
         this.currency = account.getCurrency();
+        this.status = account.getStatus();
+        this.closedAt = account.getClosedAt();
+        this.closedReason = account.getClosedReason();
         this.balance = account.getBalance();
         this.availableBalance = account.getAvailableBalance();
         this.holdAmount = account.getHoldAmount();

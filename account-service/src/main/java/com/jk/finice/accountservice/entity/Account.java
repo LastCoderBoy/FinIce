@@ -1,5 +1,6 @@
 package com.jk.finice.accountservice.entity;
 
+import com.jk.finice.accountservice.enums.AccountStatus;
 import com.jk.finice.accountservice.enums.AccountType;
 import com.jk.finice.accountservice.enums.Currency;
 import jakarta.persistence.*;
@@ -68,6 +69,20 @@ public class Account {
     @Column(name = "hold_amount", nullable = false, precision = 19, scale = 2)
     @Builder.Default
     private BigDecimal holdAmount = BigDecimal.ZERO; // the money which is in pending transactions
+
+    // ========== Account Status ==========
+
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false, length = 20)
+    @Builder.Default
+    private AccountStatus status = AccountStatus.ACTIVE;
+
+    @Column(name = "closed_at")
+    private LocalDateTime closedAt;
+
+    @Column(name = "closed_reason", length = 500)
+    private String closedReason;
+
 
     // ========== Limits ==========
 
@@ -158,5 +173,11 @@ public class Account {
         }
         this.holdAmount = this.holdAmount.subtract(amount);
         this.availableBalance = this.availableBalance.add(amount);
+    }
+
+    public void close(String reason) {
+        this.status = AccountStatus.CLOSED;
+        this.closedAt = LocalDateTime.now();
+        this.closedReason = reason;
     }
 }

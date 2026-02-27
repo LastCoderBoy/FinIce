@@ -1,5 +1,6 @@
 package com.jk.finice.accountservice.controller;
 
+import com.jk.finice.accountservice.dto.request.CloseAccountRequest;
 import com.jk.finice.accountservice.dto.request.CreateAccountRequest;
 import com.jk.finice.accountservice.dto.request.UpdateAccountRequest;
 import com.jk.finice.accountservice.dto.response.AccountResponse;
@@ -14,6 +15,8 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+
+import java.util.List;
 
 import static com.jk.finice.commonlibrary.constants.AppConstants.ACCOUNT_PATH;
 import static com.jk.finice.commonlibrary.constants.AppConstants.USER_ID_HEADER;
@@ -37,6 +40,17 @@ public class AccountController {
 
         return ResponseEntity.ok(
                 ApiResponse.success("Account created successfully", accountResponse)
+        );
+    }
+
+    @GetMapping("/all")
+    public ResponseEntity<ApiResponse<List<AccountResponse>>> getAllAccounts(@RequestHeader(USER_ID_HEADER) Long userId ){
+        log.info("[ACCOUNT-CONTROLLER] Getting all accounts");
+
+        List<AccountResponse> allAccounts = accountService.getAllAccounts(userId);
+
+        return ResponseEntity.ok(
+                ApiResponse.success("All accounts retrieved successfully", allAccounts)
         );
     }
 
@@ -88,4 +102,17 @@ public class AccountController {
                 ApiResponse.success("Account settings updated successfully", settingsResponse)
         );
     }
+
+    // We are not gonna delete the account completely, just close/freeze it
+    @PutMapping("/{accountId}")
+    public ResponseEntity<ApiResponse<Void>> closeAccount(@PathVariable Long accountId,
+                                                           @Valid @RequestBody CloseAccountRequest closeRequest,
+                                                           @RequestHeader(USER_ID_HEADER) Long userId){
+        log.info("[ACCOUNT-CONTROLLER] Closing account for account ID: {}", accountId);
+
+        accountService.closeAccount(accountId, closeRequest, userId);
+
+        return ResponseEntity.ok(ApiResponse.success("Account deleted successfully"));
+    }
+
 }

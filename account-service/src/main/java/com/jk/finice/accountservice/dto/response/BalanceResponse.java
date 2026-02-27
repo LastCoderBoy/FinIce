@@ -1,5 +1,6 @@
 package com.jk.finice.accountservice.dto.response;
 
+import com.jk.finice.accountservice.enums.AccountStatus;
 import com.jk.finice.accountservice.enums.Currency;
 import lombok.*;
 
@@ -14,6 +15,8 @@ import java.time.LocalDateTime;
 public class BalanceResponse {
 
     private String iban;
+
+    private AccountStatus status;
 
     /**
      * Total balance in the account

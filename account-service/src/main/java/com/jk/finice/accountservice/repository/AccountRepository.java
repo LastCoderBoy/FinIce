@@ -17,16 +17,16 @@ public interface AccountRepository extends JpaRepository<Account, Long> {
     Optional<Account> findByIban(String iban);
 
     @Query("SELECT COUNT(acc) FROM Account acc " +
-            "WHERE acc.userId = :userId AND acc.accountType = 'CURRENT'")
+            "WHERE acc.userId = :userId AND acc.accountType = 'CURRENT' AND acc.status = 'ACTIVE' ")
     int countCurrentAccountTypeForUserId(@Param("userId") Long userId);
 
     @Query("SELECT COUNT(acc) FROM Account acc " +
-            "WHERE acc.userId = :userId AND acc.accountType = 'SAVINGS'")
+            "WHERE acc.userId = :userId AND acc.accountType = 'SAVINGS' AND acc.status = 'ACTIVE'")
     int countSavingsAccountTypeForUserId(@Param("userId") Long userId);
 
     // Find all accounts for user
-    @Query("SELECT a FROM Account a WHERE a.userId = :userId ORDER BY a.createdAt DESC")
-    List<Account> findAllByUserId(Long userId);
+    @Query("SELECT a FROM Account a WHERE a.userId = :userId AND a.status = 'ACTIVE' ORDER BY a.createdAt DESC")
+    List<Account> findActiveAccountsByUserId(Long userId);
 
     Optional<Account> findByIdAndUserId(Long userId, Long accountId);
 }

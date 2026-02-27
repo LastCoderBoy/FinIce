@@ -1,6 +1,7 @@
 package com.jk.finice.accountservice.service.impl;
 
 import com.jk.finice.accountservice.config.AccountProperties;
+import com.jk.finice.accountservice.dto.request.CloseAccountRequest;
 import com.jk.finice.accountservice.dto.request.CreateAccountRequest;
 import com.jk.finice.accountservice.dto.request.UpdateAccountRequest;
 import com.jk.finice.accountservice.dto.response.AccountResponse;
@@ -8,7 +9,9 @@ import com.jk.finice.accountservice.dto.response.AccountSettingsResponse;
 import com.jk.finice.accountservice.dto.response.AccountSummaryResponse;
 import com.jk.finice.accountservice.dto.response.BalanceResponse;
 import com.jk.finice.accountservice.entity.Account;
+import com.jk.finice.accountservice.enums.AccountStatus;
 import com.jk.finice.accountservice.enums.AccountType;
+import com.jk.finice.accountservice.exception.AccountClosedException;
 import com.jk.finice.accountservice.exception.AccountCreationFailedException;
 import com.jk.finice.accountservice.repository.AccountRepository;
 import com.jk.finice.accountservice.service.AccountService;
@@ -36,7 +39,6 @@ public class AccountServiceImpl implements AccountService {
     private final AccountProperties accountProperties;
     private final AccountRepository accountRepository;
 
-
     // ==================== OVERRIDDEN METHODS ====================
 
     // In general, there are 6 accounts per User (1 - Current, 5 - Savings)
@@ -62,13 +64,22 @@ public class AccountServiceImpl implements AccountService {
                 .build();
 
         accountRepository.save(account);
-        accountRepository.flush();
 
         log.info("[ACCOUNT-SERVICE] Created account for user: {} with IBAN: ****{}",
                 userId,
                 MaskingUtils.maskIban(iban));
 
         return new AccountResponse(account);
+    }
+
+    @Transactional(readOnly = true)
+    @Override
+    public List<AccountResponse> getAllAccounts(Long userId){
+        List<Account> allAccounts = accountRepository.findActiveAccountsByUserId(userId);
+
+        return allAccounts.stream()
+                .map(AccountResponse::new)
+                .toList();
     }
 
     @Transactional(readOnly = true)
@@ -85,6 +96,7 @@ public class AccountServiceImpl implements AccountService {
 
         return BalanceResponse.builder()
                 .iban(MaskingUtils.maskIban(account.getIban()))
+                .status(account.getStatus())
                 .balance(account.getBalance())
                 .availableBalance(account.getAvailableBalance())
                 .holdAmount(account.getHoldAmount())
@@ -96,7 +108,7 @@ public class AccountServiceImpl implements AccountService {
     @Transactional(readOnly = true)
     @Override
     public AccountSummaryResponse getAccountSummary(Long userId) {
-        List<Account> allAccounts = accountRepository.findAllByUserId(userId);
+        List<Account> allAccounts = accountRepository.findActiveAccountsByUserId(userId);
 
         int totalSavings = 0, totalCurrent = 0;
         BigDecimal totalBalance = BigDecimal.ZERO,
@@ -166,6 +178,31 @@ public class AccountServiceImpl implements AccountService {
                 .dailyTransferLimit(account.getDailyTransferLimit())
                 .updatedAt(account.getUpdatedAt())
                 .build();
+    }
+
+
+    @Transactional
+    @Override
+    public void closeAccount(Long accountId, CloseAccountRequest closeAccountRequest, Long userId) {
+        Account account = getAccountWithOwnership(accountId, userId);
+
+        // Validate closure
+        if (account.getBalance().compareTo(BigDecimal.ZERO) != 0) {
+            throw new ValidationException(
+                    "Cannot close account with non-zero balance. Current balance: " +
+                            account.getBalance());
+        }
+
+        if (account.getHoldAmount().compareTo(BigDecimal.ZERO) != 0) {
+            throw new ValidationException(
+                    "Cannot close account with pending transactions. Held amount: " +
+                            account.getHoldAmount());
+        }
+        account.close(closeAccountRequest.getReason());
+        accountRepository.save(account);
+
+        log.info("Account {} closed successfully by User ID: {}", MaskingUtils.maskIban(account.getIban()), userId);
+
     }
 
 
@@ -259,6 +296,10 @@ public class AccountServiceImpl implements AccountService {
             log.warn("[ACCOUNT-SERVICE] User {} attempted unauthorized access to account {} (owner: {})",
                     userId, accountId, account.getUserId());
             throw new UnauthorizedException("You are not authorized to access this account");
+        }
+
+        if(account.getStatus() == AccountStatus.CLOSED ){
+            throw new AccountClosedException("This account has been permanently closed");
         }
 
         return account;

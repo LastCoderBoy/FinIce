@@ -15,6 +15,6 @@ public class CloseAccountRequest {
     @Size(min = 10, max = 500, message = "Reason must be between 10 and 500 characters")
     private String reason;
 
-    @Size(max = 16, min = 16, message = "Account number must be 16 characters")
+    @Size(max = 34, min = 24, message = "Account number must be 24 characters at least")
     private String transferToAccountNumber;  // Optional: Transfer remaining balance to this account
 }
