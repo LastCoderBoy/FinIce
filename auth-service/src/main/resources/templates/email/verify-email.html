@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Verify Your Email</title>
+</head>
+<body>
+<div class="email-container">
+    <div class="email-header">
+        <h1>{{APP_NAME}}</h1>
+    </div>
+
+    <div class="email-body">
+        <h2>Hello {{FIRST_NAME}} {{LAST_NAME}},</h2>
+
+        <p>Thank you for registering with {{APP_NAME}}!</p>
+
+        <p>To complete your registration and activate your account, please verify your email address by clicking the button below:</p>
+
+        <div class="button-container">
+            <a href="{{VERIFICATION_URL}}" class="verify-button">Verify Email Address</a>
+        </div>
+
+        <p class="expiry-notice">This link will expire in {{EXPIRY_MINUTES}} minutes.</p>
+
+        <p>If you didn't create an account with {{APP_NAME}}, please ignore this email.</p>
+
+        <div class="help-section">
+            <p><strong>Having trouble?</strong></p>
+            <p>If the button above doesn't work, copy and paste this link into your browser:</p>
+            <p class="link-text">{{VERIFICATION_URL}}</p>
+        </div>
+    </div>
+
+    <div class="email-footer">
+        <p>&copy; 2026 {{APP_NAME}}. All rights reserved.</p>
+        <p>This is an automated email. Please do not reply.</p>
+    </div>
+</div>
+</body>
+</html>

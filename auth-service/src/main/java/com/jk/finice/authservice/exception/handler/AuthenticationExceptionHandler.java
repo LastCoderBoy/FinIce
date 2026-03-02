@@ -11,6 +11,7 @@ import com.jk.finice.commonlibrary.exception.InvalidTokenException;
 import com.jk.finice.commonlibrary.exception.ResourceNotFoundException;
 import com.jk.finice.commonlibrary.exception.ValidationException;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.converter.HttpMessageNotReadableException;
@@ -56,6 +57,15 @@ public class AuthenticationExceptionHandler {
         return ResponseEntity
                 .status(HttpStatus.BAD_REQUEST)
                 .body(ApiResponse.error("Body Request is missing or has invalid structure"));
+    }
+
+    @ExceptionHandler(DataIntegrityViolationException.class)
+    public ResponseEntity<ApiResponse<Void>> handleDataIntegrityViolationException(DataIntegrityViolationException de) {
+        log.error("[AUTH-EXCEPTION-HANDLER] Data integrity violation: {}", de.getMessage());
+
+        return ResponseEntity
+                .status(HttpStatus.BAD_REQUEST)
+                .body(ApiResponse.error(de.getMessage()));
     }
 
     /**

@@ -43,8 +43,7 @@ public class EmailService {
     @Value("${email.verification.url}")
     private String emailVerificationUrl;
 
-    @Value("${spring.application.name}")
-    private String appName;
+    private final String appName = "FinIce";
 
     @Async("taskExecutor")
     public void sendVerificationEmail(User user, EmailToken emailToken) {

@@ -1,10 +1,13 @@
 package com.jk.finice.authservice.controller;
 
 
+import com.jk.finice.authservice.controller.docs.LoginDocs;
+import com.jk.finice.authservice.controller.docs.RegisterDocs;
 import com.jk.finice.authservice.dto.*;
 import com.jk.finice.authservice.entity.UserPrincipal;
 import com.jk.finice.authservice.service.AuthenticationService;
 import com.jk.finice.commonlibrary.dto.ApiResponse;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import jakarta.validation.Valid;
@@ -14,7 +17,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 
-import static com.jk.finice.commonlibrary.constants.AppConstants.*;
+import static com.jk.finice.commonlibrary.constants.AppConstants.AUTH_PATH;
 
 /**
  * Authentication Controller
@@ -27,9 +30,11 @@ import static com.jk.finice.commonlibrary.constants.AppConstants.*;
 @RequestMapping(AUTH_PATH)
 @RequiredArgsConstructor
 @Slf4j
+@Tag(name = "Authentication", description = "User authentication and authorization endpoints")
 public class AuthenticationController {
     private final AuthenticationService authService;
 
+    @RegisterDocs
     @PostMapping("/register")
     public ResponseEntity<ApiResponse<AuthResponse>> register(@Valid @RequestBody RegisterRequest registerRequest,
                                                               HttpServletResponse response,
@@ -55,6 +60,7 @@ public class AuthenticationController {
         );
     }
 
+    @LoginDocs
     @PostMapping("/login")
     public ResponseEntity<ApiResponse<AuthResponse>> login(@Valid @RequestBody LoginRequest loginRequest,
                                                            HttpServletRequest request,
