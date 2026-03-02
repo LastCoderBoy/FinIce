@@ -29,7 +29,7 @@ import java.lang.annotation.Target;
         @ApiResponse(
                 responseCode = "400",
                 description = "Invalid input or duplicate username/email",
-                content = @Content(schema = @Schema(implementation = ApiResponse.class))
+                content = @Content(schema = @Schema(implementation = com.jk.finice.commonlibrary.dto.ApiResponse.class))
         )
 })
 public @interface RegisterDocs {

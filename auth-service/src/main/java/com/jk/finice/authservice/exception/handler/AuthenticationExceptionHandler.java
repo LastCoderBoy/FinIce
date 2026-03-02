@@ -6,10 +6,7 @@ import com.jk.finice.authservice.exception.AccountNotVerifiedException;
 import com.jk.finice.authservice.exception.DuplicateResourceFoundException;
 import com.jk.finice.authservice.exception.JwtAuthenticationException;
 import com.jk.finice.commonlibrary.dto.ApiResponse;
-import com.jk.finice.commonlibrary.exception.InternalServerException;
-import com.jk.finice.commonlibrary.exception.InvalidTokenException;
-import com.jk.finice.commonlibrary.exception.ResourceNotFoundException;
-import com.jk.finice.commonlibrary.exception.ValidationException;
+import com.jk.finice.commonlibrary.exception.*;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
@@ -80,6 +77,16 @@ public class AuthenticationExceptionHandler {
                 .body(ApiResponse.error(ex.getMessage()));
     }
 
+    @ExceptionHandler(UnauthorizedException.class)
+    public ResponseEntity<ApiResponse<Void>> handleUnauthorizedException(UnauthorizedException ex) {
+        log.error("[AUTH-EXCEPTION-HANDLER] Unauthorized Access: {}", ex.getMessage());
+
+        return ResponseEntity
+                .status(HttpStatus.UNAUTHORIZED)
+                .body(ApiResponse.error(ex.getMessage()));
+    }
+
+
     @ExceptionHandler(DuplicateResourceFoundException.class)
     public ResponseEntity<ApiResponse<Void>> handleDuplicateResourceFoundException(DuplicateResourceFoundException ex) {
         log.error("[AUTH-EXCEPTION-HANDLER] Duplicate resource found: {}", ex.getMessage());
@@ -95,7 +102,7 @@ public class AuthenticationExceptionHandler {
         log.error("[AUTH-EXCEPTION-HANDLER] Account locked: {}", ex.getMessage());
 
         return ResponseEntity
-                .status(HttpStatus.FORBIDDEN)
+                .status(HttpStatus.TOO_MANY_REQUESTS)
                 .body(ApiResponse.error(ex.getMessage()));
     }
 

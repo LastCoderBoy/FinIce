@@ -16,5 +16,4 @@ public class LoginRequest {
     @NotBlank(message = "Password is required")
     private String password;
 
-    private String currentLoginIp; // Will be compared against the last login IP
 }

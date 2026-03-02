@@ -1,8 +1,7 @@
 package com.jk.finice.authservice.controller;
 
 
-import com.jk.finice.authservice.controller.docs.LoginDocs;
-import com.jk.finice.authservice.controller.docs.RegisterDocs;
+import com.jk.finice.authservice.controller.docs.*;
 import com.jk.finice.authservice.dto.*;
 import com.jk.finice.authservice.entity.UserPrincipal;
 import com.jk.finice.authservice.service.AuthenticationService;
@@ -50,6 +49,7 @@ public class AuthenticationController {
         );
     }
 
+    @GetProfileDocs
     @GetMapping("/profile")
     public ResponseEntity<ApiResponse<UserResponse>> getProfile(@AuthenticationPrincipal UserPrincipal principal){
         log.info("[AUTH-CONTROLLER] Getting user details...");
@@ -71,6 +71,7 @@ public class AuthenticationController {
         return ResponseEntity.ok(ApiResponse.success("User logged in successfully", authResponse));
     }
 
+    @LogoutDocs
     @PostMapping("/logout")
     public ResponseEntity<ApiResponse<Void>> logout(@AuthenticationPrincipal UserPrincipal principal,
                                                     HttpServletResponse response, // used for clearing the cookies
@@ -81,6 +82,7 @@ public class AuthenticationController {
         return ResponseEntity.ok(ApiResponse.success("User logged out successfully"));
     }
 
+    @UpdateProfileDocs
     @PatchMapping("/update")
     public ResponseEntity<ApiResponse<UserResponse>> updateProfile(@RequestBody @Valid UpdateUserRequest updateUserRequest,
                                                                    @AuthenticationPrincipal UserPrincipal principal,

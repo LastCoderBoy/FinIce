@@ -17,10 +17,7 @@ import com.jk.finice.authservice.service.AuthenticationService;
 import com.jk.finice.authservice.service.EmailTokenService;
 import com.jk.finice.authservice.service.RefreshTokenService;
 import com.jk.finice.authservice.utils.HeaderExtractor;
-import com.jk.finice.commonlibrary.exception.InternalServerException;
-import com.jk.finice.commonlibrary.exception.InvalidTokenException;
-import com.jk.finice.commonlibrary.exception.ResourceNotFoundException;
-import com.jk.finice.commonlibrary.exception.ValidationException;
+import com.jk.finice.commonlibrary.exception.*;
 import com.jk.finice.commonlibrary.utils.TokenUtils;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
@@ -200,7 +197,7 @@ public class AuthenticationServiceImpl implements AuthenticationService {
             log.warn("[AUTH-SERVICE] Login failed: {}", e.getMessage());
 
             updateFailedLoginAttempts(loginRequest.getUsernameOrEmail());
-            throw new BadCredentialsException("Invalid credentials");
+            throw new UnauthorizedException("Invalid credentials");
         } catch (AccountLockedException e) {
             log.warn("[AUTH-SERVICE] Account is locked: {}", e.getMessage());
             throw e;
@@ -219,7 +216,7 @@ public class AuthenticationServiceImpl implements AuthenticationService {
                 userRepository.save(user);
 
                 if(user.getFailedLoginAttempts() == 4){
-                    throw new BadCredentialsException("Account will be locked after 1 more failed attempt");
+                    throw new UnauthorizedException("Account will be locked after 1 more failed attempt");
                 }
 
                 if (user.getAccountLocked()) {
@@ -228,7 +225,7 @@ public class AuthenticationServiceImpl implements AuthenticationService {
                     throw new AccountLockedException("Account is locked for 30 minutes due to failed attempts");
                 }
             }
-        } catch (BadCredentialsException | AccountLockedException e) {
+        } catch (UnauthorizedException | AccountLockedException e) {
             // Re-throw
             throw e;
         } catch (Exception e) {

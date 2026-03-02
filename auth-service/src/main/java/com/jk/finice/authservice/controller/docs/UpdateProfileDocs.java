@@ -1,11 +1,12 @@
 package com.jk.finice.authservice.controller.docs;
 
-import com.jk.finice.authservice.dto.AuthResponse;
+import com.jk.finice.authservice.dto.UserResponse;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.media.Content;
 import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
+import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 
 import java.lang.annotation.ElementType;
 import java.lang.annotation.Retention;
@@ -15,42 +16,41 @@ import java.lang.annotation.Target;
 @Target(ElementType.METHOD)
 @Retention(RetentionPolicy.RUNTIME)
 @Operation(
-        summary = "User login",
+        summary = "Update user profile",
         description = """
-                Authenticate user with username/email and password.
-                
-                **Returns:**
-                - JWT access token (in response body)
-                - Refresh token (in HTTP-only cookie)
+                Update user's username, first name, last name, or phone number.
                 
                 **Authentication:**
-                - No JWT required for this endpoint
+                - Requires valid JWT token
                 
-                **Rate Limiting:**
-                - Max 5 attempts per minute per IP
+                **Updatable Fields:**
+                - Username
+                - First name
+                - Last name
+                - Phone number
+                
+                **Note:**
+                - At least one field must be provided
                 """
+        ,
+        security = @SecurityRequirement(name = "Bearer Authentication")
 )
 @ApiResponses(value = {
         @ApiResponse(
                 responseCode = "200",
-                description = "Login successful",
-                content = @Content(schema = @Schema(implementation = AuthResponse.class))
+                description = "Profile updated successfully",
+                content = @Content(schema = @Schema(implementation = UserResponse.class))
+        ),
+        @ApiResponse(
+                responseCode = "400",
+                description = "Invalid input data",
+                content = @Content(schema = @Schema(implementation = com.jk.finice.commonlibrary.dto.ApiResponse.class))
         ),
         @ApiResponse(
                 responseCode = "401",
-                description = "Invalid credentials",
-                content = @Content(schema = @Schema(implementation = com.jk.finice.commonlibrary.dto.ApiResponse.class))
-        ),
-        @ApiResponse(
-                responseCode = "403",
-                description = "Account not verified or locked",
-                content = @Content(schema = @Schema(implementation = com.jk.finice.commonlibrary.dto.ApiResponse.class))
-        ),
-        @ApiResponse(
-                responseCode = "429",
-                description = "Too many login attempts",
+                description = "Unauthorized",
                 content = @Content(schema = @Schema(implementation = com.jk.finice.commonlibrary.dto.ApiResponse.class))
         )
 })
-public @interface LoginDocs {
+public @interface UpdateProfileDocs {
 }
