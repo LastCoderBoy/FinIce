@@ -24,6 +24,28 @@ public class GatewayConfig {
     public RouteLocator routeLocator(RouteLocatorBuilder builder) {
         return builder.routes()
                 // ==========================================
+                // SWAGGER/OPENAPI DOCUMENTATION ROUTES
+                // (Public - No JWT required)
+                // ==========================================
+
+                // Auth Service Swagger
+                .route("auth-service-swagger", r -> r
+                        .path("/auth-service/v3/api-docs", "/auth-service/swagger-ui/**")
+                        .filters(f -> f.rewritePath(
+                                "/auth-service/(?<segment>.*)",
+                                "/${segment}"))
+                        .uri("lb://" + AUTH_SERVICE))
+
+                // Account Service Swagger
+                .route("account-service-swagger", r -> r
+                        .path("/account-service/v3/api-docs", "/account-service/swagger-ui/**")
+                        .filters(f -> f.rewritePath(
+                                "/account-service/(?<segment>.*)",
+                                "/${segment}"))
+                        .uri("lb://" + ACCOUNT_SERVICE))
+
+
+                // ==========================================
                 // PUBLIC PATH (No JWT required)
                 // ==========================================
                 .route("auth-public", r -> r

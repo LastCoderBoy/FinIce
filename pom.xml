@@ -130,6 +130,13 @@
 				<version>${springdoc.version}</version>
 			</dependency>
 
+			<!-- SpringDoc for WebFlux (Gateway) -->
+			<dependency>
+				<groupId>org.springdoc</groupId>
+				<artifactId>springdoc-openapi-starter-webflux-ui</artifactId>
+				<version>${springdoc.version}</version>
+			</dependency>
+
 			<!-- Spring Dotenv (for .env file support) -->
 			<dependency>
 				<groupId>me.paulschwarz</groupId>

@@ -78,6 +78,27 @@ eureka:
       version: 1.0.0
 
 # ========================================
+# SPRINGDOC / SWAGGER CONFIGURATION
+# ========================================
+springdoc:
+  api-docs:
+    enabled: true
+    path: /v3/api-docs
+  swagger-ui:
+    enabled: true
+    path: /swagger-ui.html
+    # Aggregated service documentation
+    urls:
+      - name: Auth Service
+        url: /auth-service/v3/api-docs
+      - name: Account Service
+        url: /account-service/v3/api-docs
+    config-url: /v3/api-docs/swagger-config
+    display-request-duration: true
+    tags-sorter: alpha
+    operations-sorter: method
+
+# ========================================
 # RESILIENCE4J - CIRCUIT BREAKER
 # ========================================
 resilience4j:

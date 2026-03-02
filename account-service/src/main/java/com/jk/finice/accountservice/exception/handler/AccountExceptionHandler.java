@@ -5,6 +5,7 @@ import com.jk.finice.accountservice.exception.AccountCreationFailedException;
 import com.jk.finice.commonlibrary.dto.ApiResponse;
 import com.jk.finice.commonlibrary.exception.*;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.converter.HttpMessageNotReadableException;
@@ -70,7 +71,7 @@ public class AccountExceptionHandler {
 
     @ExceptionHandler(ResourceNotFoundException.class)
     public ResponseEntity<ApiResponse<Void>> handleResourceNotFound(ResourceNotFoundException ex) {
-        log.error("[AUTH-EXCEPTION-HANDLER] Resource not found: {}", ex.getMessage());
+        log.error("[ACCOUNT-EXCEPTION-HANDLER] Resource not found: {}", ex.getMessage());
 
         return ResponseEntity
                 .status(HttpStatus.NOT_FOUND)
@@ -79,11 +80,20 @@ public class AccountExceptionHandler {
 
     @ExceptionHandler(DatabaseException.class)
     public ResponseEntity<ApiResponse<Void>> handleDatabaseException(DatabaseException ex) {
-        log.error("[AUTH-EXCEPTION-HANDLER] Database exception: {}", ex.getMessage());
+        log.error("[ACCOUNT-EXCEPTION-HANDLER] Database exception: {}", ex.getMessage());
 
         return ResponseEntity
                 .status(HttpStatus.INTERNAL_SERVER_ERROR)
                 .body(ApiResponse.error(ex.getMessage()));
+    }
+
+    @ExceptionHandler(DataIntegrityViolationException.class)
+    public ResponseEntity<ApiResponse<Void>> handleDataIntegrityViolationException(DataIntegrityViolationException de) {
+        log.error("[ACCOUNT-EXCEPTION-HANDLER] Data integrity violation: {}", de.getMessage());
+
+        return ResponseEntity
+                .status(HttpStatus.BAD_REQUEST)
+                .body(ApiResponse.error(de.getMessage()));
     }
 
     /**
@@ -91,7 +101,7 @@ public class AccountExceptionHandler {
      */
     @ExceptionHandler(ValidationException.class)
     public ResponseEntity<ApiResponse<Void>> handleValidation(ValidationException ex) {
-        log.error("[AUTH-EXCEPTION-HANDLER] Validation exception: {}", ex.getMessage());
+        log.error("[ACCOUNT-EXCEPTION-HANDLER] Validation exception: {}", ex.getMessage());
 
         return ResponseEntity
                 .status(HttpStatus.BAD_REQUEST)
@@ -100,7 +110,7 @@ public class AccountExceptionHandler {
 
     @ExceptionHandler(UnauthorizedException.class)
     public ResponseEntity<ApiResponse<Void>> handleUnauthorizedException(UnauthorizedException ex) {
-        log.error("[AUTH-EXCEPTION-HANDLER] Unauthorized exception: {}", ex.getMessage());
+        log.error("[ACCOUNT-EXCEPTION-HANDLER] Unauthorized exception: {}", ex.getMessage());
 
         return ResponseEntity
                 .status(HttpStatus.UNAUTHORIZED)
@@ -112,7 +122,7 @@ public class AccountExceptionHandler {
      */
     @ExceptionHandler(InternalServerException.class)
     public ResponseEntity<ApiResponse<Void>> handleService(InternalServerException ex) {
-        log.error("[AUTH-EXCEPTION-HANDLER] Service exception: {}", ex.getMessage(), ex);
+        log.error("[ACCOUNT-EXCEPTION-HANDLER] Service exception: {}", ex.getMessage(), ex);
 
         return ResponseEntity
                 .status(HttpStatus.INTERNAL_SERVER_ERROR)
@@ -124,7 +134,7 @@ public class AccountExceptionHandler {
      */
     @ExceptionHandler(Exception.class)
     public ResponseEntity<ApiResponse<Void>> handleGeneric(Exception ex) {
-        log.error("[AUTH-EXCEPTION-HANDLER] Unexpected error: {}", ex.getMessage(), ex);
+        log.error("[ACCOUNT-EXCEPTION-HANDLER] Unexpected error: {}", ex.getMessage(), ex);
 
         return ResponseEntity
                 .status(HttpStatus.INTERNAL_SERVER_ERROR)

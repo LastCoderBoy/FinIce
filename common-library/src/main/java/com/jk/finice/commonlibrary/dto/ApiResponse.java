@@ -8,7 +8,7 @@ import lombok.Setter;
 import java.io.Serializable;
 
 /**
- * Standard API response wrapper for all SIMS microservices
+ * Standard API response wrapper for all FinIce microservices
  * Provides a consistent response structure across all services
  *
  * @param <T> Type of data payload

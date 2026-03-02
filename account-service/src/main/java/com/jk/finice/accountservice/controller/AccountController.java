@@ -29,7 +29,7 @@ public class AccountController {
 
     private final AccountService accountService;
 
-    @PostMapping("/create")
+    @PostMapping
     public ResponseEntity<ApiResponse<AccountResponse>> createAccount(
             @Valid @RequestBody CreateAccountRequest createRequest,
             @RequestHeader(USER_ID_HEADER) Long userId ){ // Token validation was done in the API Gateway
@@ -43,7 +43,7 @@ public class AccountController {
         );
     }
 
-    @GetMapping("/all")
+    @GetMapping
     public ResponseEntity<ApiResponse<List<AccountResponse>>> getAllAccounts(@RequestHeader(USER_ID_HEADER) Long userId ){
         log.info("[ACCOUNT-CONTROLLER] Getting all accounts");
 
@@ -103,8 +103,8 @@ public class AccountController {
         );
     }
 
-    // We are not gonna delete the account completely, just close/freeze it
-    @PutMapping("/{accountId}")
+    // We are not gonna delete the account completely, just close it
+    @DeleteMapping("/{accountId}")
     public ResponseEntity<ApiResponse<Void>> closeAccount(@PathVariable Long accountId,
                                                            @Valid @RequestBody CloseAccountRequest closeRequest,
                                                            @RequestHeader(USER_ID_HEADER) Long userId){

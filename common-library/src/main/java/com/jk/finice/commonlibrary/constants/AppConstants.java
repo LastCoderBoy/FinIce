@@ -96,4 +96,12 @@ public final class AppConstants {
     public static final String DEFAULT_SORT_DIRECTION = "DESC";
 
 
+    // ========================================
+    // OpenAPI/Swagger Documentation Paths
+    // ========================================
+    public static final String OPENAPI_VERSION = "v3";  // ← OpenAPI spec version
+    public static final String OPENAPI_DOCS_PATH = "/" + OPENAPI_VERSION + "/api-docs";
+    public static final String SWAGGER_UI_PATH = "/swagger-ui.html";
+    public static final String SWAGGER_UI_RESOURCES = "/swagger-ui/**";
+    public static final String SWAGGER_RESOURCES = "/swagger-resources/**";
 }
