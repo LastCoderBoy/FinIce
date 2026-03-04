@@ -1,5 +1,6 @@
 package com.jk.finice.accountservice.controller;
 
+import com.jk.finice.accountservice.controller.docs.*;
 import com.jk.finice.accountservice.dto.request.CloseAccountRequest;
 import com.jk.finice.accountservice.dto.request.CreateAccountRequest;
 import com.jk.finice.accountservice.dto.request.UpdateAccountRequest;
@@ -9,6 +10,7 @@ import com.jk.finice.accountservice.dto.response.AccountSummaryResponse;
 import com.jk.finice.accountservice.dto.response.BalanceResponse;
 import com.jk.finice.accountservice.service.AccountService;
 import com.jk.finice.commonlibrary.dto.ApiResponse;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.NonNull;
 import lombok.RequiredArgsConstructor;
@@ -25,10 +27,12 @@ import static com.jk.finice.commonlibrary.constants.AppConstants.USER_ID_HEADER;
 @Slf4j
 @RequiredArgsConstructor
 @RequestMapping(ACCOUNT_PATH)
+@Tag(name = "Accounts", description = "Account management endpoints for FinIce Banking")
 public class AccountController {
 
     private final AccountService accountService;
 
+    @CreateAccountDocs
     @PostMapping
     public ResponseEntity<ApiResponse<AccountResponse>> createAccount(
             @Valid @RequestBody CreateAccountRequest createRequest,
@@ -43,6 +47,7 @@ public class AccountController {
         );
     }
 
+    @GetAllAccountsDocs
     @GetMapping
     public ResponseEntity<ApiResponse<List<AccountResponse>>> getAllAccounts(@RequestHeader(USER_ID_HEADER) Long userId ){
         log.info("[ACCOUNT-CONTROLLER] Getting all accounts");
@@ -54,6 +59,7 @@ public class AccountController {
         );
     }
 
+    @GetAccountDetailsDocs
     @GetMapping("/{accountId}")
     public ResponseEntity<ApiResponse<AccountResponse>> viewAccountDetails(@PathVariable Long accountId,
                                                                            @RequestHeader(USER_ID_HEADER) Long userId ){
@@ -66,6 +72,7 @@ public class AccountController {
         );
     }
 
+    @GetBalanceDocs
     @GetMapping("/{accountId}/balance")
     public ResponseEntity<ApiResponse<BalanceResponse>> fetchBalance(@PathVariable Long accountId,
                                                                      @RequestHeader(USER_ID_HEADER) Long userId){
@@ -79,6 +86,7 @@ public class AccountController {
         );
     }
 
+    @GetSummaryDocs
     @GetMapping("/summary")
     public ResponseEntity<ApiResponse<AccountSummaryResponse>> getAccountSummary(@RequestHeader(USER_ID_HEADER) Long userId){
         log.info("[ACCOUNT-CONTROLLER] Getting account summary for user ID: {}", userId);
@@ -90,6 +98,7 @@ public class AccountController {
         );
     }
 
+    @UpdateSettingsDocs
     @PatchMapping("/{accountId}/settings")
     public ResponseEntity<ApiResponse<AccountSettingsResponse>> updateAccountSetting(@Valid @RequestBody UpdateAccountRequest updateRequest,
                                                                                      @PathVariable Long accountId,
@@ -104,6 +113,7 @@ public class AccountController {
     }
 
     // We are not gonna delete the account completely, just close it
+    @CloseAccountDocs
     @DeleteMapping("/{accountId}")
     public ResponseEntity<ApiResponse<Void>> closeAccount(@PathVariable Long accountId,
                                                            @Valid @RequestBody CloseAccountRequest closeRequest,
