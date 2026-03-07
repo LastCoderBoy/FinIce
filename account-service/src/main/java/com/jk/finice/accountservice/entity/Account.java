@@ -2,7 +2,7 @@ package com.jk.finice.accountservice.entity;
 
 import com.jk.finice.accountservice.enums.AccountStatus;
 import com.jk.finice.accountservice.enums.AccountType;
-import com.jk.finice.accountservice.enums.Currency;
+import com.jk.finice.commonlibrary.enums.Currency;
 import jakarta.persistence.*;
 import lombok.*;
 import org.hibernate.annotations.CreationTimestamp;

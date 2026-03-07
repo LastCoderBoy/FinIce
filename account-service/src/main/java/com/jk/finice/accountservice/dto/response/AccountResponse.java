@@ -3,7 +3,7 @@ package com.jk.finice.accountservice.dto.response;
 import com.jk.finice.accountservice.entity.Account;
 import com.jk.finice.accountservice.enums.AccountStatus;
 import com.jk.finice.accountservice.enums.AccountType;
-import com.jk.finice.accountservice.enums.Currency;
+import com.jk.finice.commonlibrary.enums.Currency;
 import com.fasterxml.jackson.annotation.JsonInclude;
 import lombok.*;
 

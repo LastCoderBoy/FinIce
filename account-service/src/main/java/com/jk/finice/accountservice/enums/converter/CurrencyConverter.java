@@ -1,6 +1,6 @@
 package com.jk.finice.accountservice.enums.converter;
 
-import com.jk.finice.accountservice.enums.Currency;
+import com.jk.finice.commonlibrary.enums.Currency;
 import com.jk.finice.commonlibrary.exception.ValidationException;
 import org.springframework.core.convert.converter.Converter;
 import org.springframework.lang.NonNull;

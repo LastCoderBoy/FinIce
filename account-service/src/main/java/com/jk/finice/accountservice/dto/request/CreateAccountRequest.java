@@ -1,7 +1,7 @@
 package com.jk.finice.accountservice.dto.request;
 
 import com.jk.finice.accountservice.enums.AccountType;
-import com.jk.finice.accountservice.enums.Currency;
+import com.jk.finice.commonlibrary.enums.Currency;
 import jakarta.validation.constraints.DecimalMin;
 import jakarta.validation.constraints.Digits;
 import jakarta.validation.constraints.NotNull;

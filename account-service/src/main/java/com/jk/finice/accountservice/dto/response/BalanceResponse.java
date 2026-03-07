@@ -1,7 +1,7 @@
 package com.jk.finice.accountservice.dto.response;
 
 import com.jk.finice.accountservice.enums.AccountStatus;
-import com.jk.finice.accountservice.enums.Currency;
+import com.jk.finice.commonlibrary.enums.Currency;
 import lombok.*;
 
 import java.math.BigDecimal;

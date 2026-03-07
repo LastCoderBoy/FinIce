@@ -1,4 +1,4 @@
-package com.jk.finice.accountservice.enums;
+package com.jk.finice.commonlibrary.enums;
 
 import lombok.Getter;
 
