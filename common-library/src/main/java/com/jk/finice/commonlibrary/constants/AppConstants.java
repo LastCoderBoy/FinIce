@@ -18,7 +18,7 @@ public final class AppConstants {
     public static final String IP_ADDRESS_HEADER = "X-Forwarded-For";
     public static final String USER_ID_HEADER = "X-User-ID";
     public static final String USER_ROLES_HEADER = "X-User-Roles";
-    public static final String USERNAME_HEADER = "X-Username";
+    public static final String USER_EMAIL_HEADER = "X-User-Email";
 
     // ========== Service Names ==========
     public static final String EUREKA_SERVER = "eureka-server";

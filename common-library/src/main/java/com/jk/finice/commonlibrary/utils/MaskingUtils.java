@@ -1,4 +1,4 @@
-package com.jk.finice.accountservice.util;
+package com.jk.finice.commonlibrary.utils;
 
 public final class MaskingUtils {
     private MaskingUtils() {}
