@@ -1,5 +1,6 @@
 package com.jk.finice.apigateway.security;
 
+import com.jk.finice.commonlibrary.dto.JwtClaimsPayload;
 import com.jk.finice.commonlibrary.exception.InvalidTokenException;
 import com.jk.finice.commonlibrary.utils.TokenUtils;
 import com.jk.finice.apigateway.redis.RedisService;
@@ -18,10 +19,7 @@ import org.springframework.util.PathMatcher;
 import org.springframework.web.server.ServerWebExchange;
 import reactor.core.publisher.Mono;
 
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 
 import static com.jk.finice.commonlibrary.constants.AppConstants.*;
 
@@ -30,12 +28,12 @@ import static com.jk.finice.commonlibrary.constants.AppConstants.*;
 public class JwtAuthenticationFilter extends AbstractGatewayFilterFactory<JwtAuthenticationFilter.Config> {
 
     private final PathMatcher pathMatcher;
-    private final JwtProvider jwtProvider;
+    private final JwtTokenProcessor jwtTokenProcessor;
     private final RedisService redisService;
     @Autowired
-    public JwtAuthenticationFilter(JwtProvider jwtProvider, RedisService redisService) {
+    public JwtAuthenticationFilter(JwtTokenProcessor jwtTokenProcessor, RedisService redisService) {
         super(Config.class);
-        this.jwtProvider = jwtProvider;
+        this.jwtTokenProcessor = jwtTokenProcessor;
         this.redisService = redisService;
         this.pathMatcher = new AntPathMatcher();
     }
@@ -46,40 +44,58 @@ public class JwtAuthenticationFilter extends AbstractGatewayFilterFactory<JwtAut
             ServerHttpRequest request = exchange.getRequest();
             String path = request.getPath().toString();
 
-            log.info("[JWT-AUTH-FILTER] Processing request: {} {}", request.getMethod(), path);
+            log.info("[GATEWAY-FILTER] Processing request: {} {}", request.getMethod(), path);
 
+            // Strip any client-supplied internal headers FIRST
+            // Prevents header injection attacks where a client pretends
+            // to be an authenticated user by forging these headers.
+            ServerHttpRequest sanitizedRequest = request.mutate().headers(httpHeaders -> {
+                        httpHeaders.remove(USER_ID_HEADER);
+                        httpHeaders.remove(USER_EMAIL_HEADER);
+                        httpHeaders.remove(USER_ROLES_HEADER);
+                    })
+                    .build();
+
+            ServerWebExchange sanitizedExchange = exchange.mutate().request(sanitizedRequest).build();
+
+
+            // Note: this check is a safety net.
+            // Public routes should NOT have JwtAuthenticationFilter applied in GatewayConfig.
+            // This handles edge cases where the filter is applied broadly.
             if (isPublicPath(path, config)) {
-                log.info("[JWT-AUTH-FILTER] Public path detected, skipping authentication");
+                log.info("[GATEWAY-FILTER] Public path detected, skipping authentication");
                 return chain.filter(exchange);
             }
 
-            if (!request.getHeaders().containsKey(AUTHORIZATION_HEADER)) {
-                log.warn("[JWT-AUTH-FILTER] Missing Authorization header for: {}", path);
+            if (!sanitizedRequest.getHeaders().containsKey(AUTHORIZATION_HEADER)) {
+                log.warn("[GATEWAY-FILTER] Missing Authorization header for: {}", path);
                 return onError(exchange, "Missing Authorization header", HttpStatus.UNAUTHORIZED);
             }
 
-            String authHeader = request.getHeaders().getFirst(AUTHORIZATION_HEADER);
+            String authHeader = sanitizedRequest.getHeaders().getFirst(AUTHORIZATION_HEADER);
 
             try {
                 String token = TokenUtils.validateAndExtractToken(authHeader);
 
-                if (!jwtProvider.validateToken(token)) {
-                    log.warn("[JWT-AUTH-FILTER] Invalid JWT token for path: {}", path);
+                // Validate token & extract claims
+                Optional<JwtClaimsPayload> jwtClaimsPayload = jwtTokenProcessor.validateAndExtractClaims(token);
+                if (jwtClaimsPayload.isEmpty()) {
                     return onError(exchange, "Token has expired or has invalid structure", HttpStatus.UNAUTHORIZED);
                 }
+                JwtClaimsPayload claimsPayload = jwtClaimsPayload.get();
+
+                // Extract user details
+                String userId = String.valueOf(claimsPayload.userId());
+                String email = claimsPayload.email(); // cannot be null
+                List<String> userRoles = claimsPayload.roles();
 
                 // Check if token is blacklisted in Redis Cache
                 return redisService.isTokenBlacklisted(token)
                         .flatMap(isBlacklisted -> {
                             if (isBlacklisted) {
-                                log.warn("[JWT-AUTH-FILTER] Blacklisted token attempted for: {}", path);
+                                log.warn("[GATEWAY-FILTER] Blacklisted token attempted for: {}", path);
                                 return onError(exchange, "Token has been revoked", HttpStatus.UNAUTHORIZED);
                             }
-
-                            // Extract user details
-                            String userId = String.valueOf(jwtProvider.getUserIdFromToken(token));
-                            String username = jwtProvider.getUsernameFromJWT(token);
-                            List<String> userRoles = jwtProvider.getRolesFromToken(token);
 
                             // Check required roles
                             if (!config.getRequiredRoles().isEmpty()) {
@@ -87,30 +103,30 @@ public class JwtAuthenticationFilter extends AbstractGatewayFilterFactory<JwtAut
                                         .anyMatch(role -> config.getRequiredRoles().contains(role));
 
                                 if (!hasRequiredRole) {
-                                    log.warn("[JWT-AUTH-FILTER] User {} lacks required roles for {}",
-                                            username, path);
+                                    log.warn("[GATEWAY-FILTER] User {} lacks required roles for {}",
+                                            email, path);
                                     return onError(exchange, config.getForbiddenMessage(), HttpStatus.FORBIDDEN);
                                 }
                             }
 
-                            log.info("[JWT-AUTH-FILTER] User {} (ID: {}) authenticated successfully",
-                                    username, userId);
+                            log.info("[GATEWAY-FILTER] User {} (ID: {}) authenticated successfully",
+                                    email, userId);
 
                             // Add user context headers
-                            ServerHttpRequest modifiedRequest = request.mutate()
-                                    .header(USER_ID_HEADER, userId != null ? userId : "")
-                                    .header(USERNAME_HEADER, username)
+                            ServerHttpRequest modifiedRequest = sanitizedRequest.mutate()
+                                    .header(USER_ID_HEADER, userId)
+                                    .header(USER_EMAIL_HEADER, email)
                                     .header(USER_ROLES_HEADER, String.join(",", userRoles))
                                     .build();
 
-                            return chain.filter(exchange.mutate().request(modifiedRequest).build());
+                            return chain.filter(sanitizedExchange.mutate().request(modifiedRequest).build());
                         });
 
             } catch (InvalidTokenException e) {
-                log.warn("[JWT-AUTH-FILTER] Invalid token: {}", e.getMessage());
+                log.warn("[GATEWAY-FILTER] Invalid token: {}", e.getMessage());
                 return onError(exchange, e.getMessage(), HttpStatus.UNAUTHORIZED);
             } catch (Exception e) {
-                log.error("[JWT-AUTH-FILTER] Unexpected error: {}", e.getMessage(), e);
+                log.error("[GATEWAY-FILTER] Unexpected error: {}", e.getMessage(), e);
                 return onError(exchange, "Internal server error", HttpStatus.INTERNAL_SERVER_ERROR);
             }
         };

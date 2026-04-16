@@ -23,7 +23,7 @@ import static com.jk.finice.commonlibrary.constants.AppConstants.AUTH_PATH;
  * Handles register, login, logout, and user updates
  *
  * @author LastCoderBoy
- * @since 2026-01-26
+ * @since 1.0.0
  */
 @RestController
 @RequestMapping(AUTH_PATH)

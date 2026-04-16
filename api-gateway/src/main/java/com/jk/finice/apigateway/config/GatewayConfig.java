@@ -92,11 +92,12 @@ public class GatewayConfig {
                         .uri("lb://" + TRANSACTION_SERVICE))
 
                 // ==========================================
-                // CATCH-ALL / DEFAULT (for unmapped paths)
+                // CATCH-ALL / DEFAULT (MUST remain last — catches all unmatched routes)
                 // ==========================================
                 .route("default-route", r -> r
                         .path("/**")
-                        .filters(f -> f.setStatus(HttpStatus.NOT_FOUND))
+                        .and()
+                        .not(p -> p.path("/fallback/**"))   // exclude fallback endpoints
                         .uri("forward:/fallback/default"))
 
 

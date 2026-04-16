@@ -21,7 +21,7 @@ import java.util.stream.Collectors;
  * Wraps Users entity for authentication
  *
  * @author LastCoderBoy
- * @since 2026-01-26
+ * @since 1.0.0
  */
 @Getter
 @Builder
@@ -30,7 +30,6 @@ public class UserPrincipal implements UserDetails {
 
     // ==================== Core Identity Fields ====================
     private final Long id;
-    private final String username;
     private final String email;
 
     // ==================== Security Fields ====================
@@ -65,7 +64,6 @@ public class UserPrincipal implements UserDetails {
 
         return UserPrincipal.builder()
                 .id(user.getId())
-                .username(user.getUsername())
                 .email(user.getEmail())
                 .password(user.getPassword())
                 .accountStatus(user.getAccountStatus())
@@ -80,14 +78,13 @@ public class UserPrincipal implements UserDetails {
      * Create UserPrincipal from JWT claims (for JWT-based authentication)
      * Used by JwtFilter
      */
-    public static UserPrincipal fromJwtClaims(Long userId, String username, String email, List<String> roles) {
+    public static UserPrincipal fromJwtClaims(Long userId, String email, List<String> roles) {
         List<GrantedAuthority> authorities = roles.stream()
                 .map(SimpleGrantedAuthority::new)
                 .collect(Collectors.toList());
 
         return UserPrincipal.builder()
                 .id(userId)
-                .username(username)
                 .email(email)
                 .password(null)  // Not in JWT
                 .accountStatus(AccountStatus.ACTIVE)  // Assume active if JWT is valid
@@ -112,7 +109,7 @@ public class UserPrincipal implements UserDetails {
 
     @Override
     public String getUsername() {
-        return username;
+        return email;
     }
 
     @Override

@@ -28,12 +28,24 @@ public class CorsConfig {
 
         corsConfig.setAllowedOrigins(appProperties.getCors().getAllowedOrigins());
         corsConfig.setAllowedMethods(appProperties.getCors().getAllowedMethods());
-        corsConfig.setAllowedHeaders(List.of("*"));
         corsConfig.setAllowCredentials(appProperties.getCors().isAllowCredentials());
         corsConfig.setMaxAge(appProperties.getCors().getMaxAge());
 
-        corsConfig.setAllowedHeaders(
-                Arrays.asList(USER_ROLES_HEADER, AUTHORIZATION_HEADER, USER_ID_HEADER, "Content-Type"));
+        corsConfig.setAllowedHeaders(List.of(
+                "Authorization",
+                "Content-Type",
+                "Accept",
+                "X-Requested-With",
+                "Cache-Control",
+                "Origin"
+                // Do NOT include X-User-Id, X-User-Roles here
+                // because those are custom headers added by the gateway after authentication, not sent by the browser.
+        ));
+        corsConfig.setExposedHeaders(Arrays.asList(
+                AUTHORIZATION_HEADER,
+                USER_ID_HEADER,
+                USER_ROLES_HEADER
+        ));
 
         UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
         source.registerCorsConfiguration("/**", corsConfig);

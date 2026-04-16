@@ -2,7 +2,7 @@ package com.jk.finice.authservice.service.impl;
 
 import com.jk.finice.authservice.config.AuthCookiesManager;
 import com.jk.finice.authservice.config.redis.RedisService;
-import com.jk.finice.authservice.config.security.JwtProvider;
+import com.jk.finice.authservice.config.security.JwtTokenProcessor;
 import com.jk.finice.authservice.dto.*;
 import com.jk.finice.authservice.service.email.EmailService;
 import com.jk.finice.authservice.entity.*;
@@ -50,7 +50,7 @@ public class AuthenticationServiceImpl implements AuthenticationService {
     private final EmailTokenService emailTokenService;
     private final EmailService emailService;
     private final AuthCookiesManager cookiesManager;
-    private final JwtProvider jwtProvider;
+    private final JwtTokenProcessor jwtTokenProcessor;
     private final RedisService redisService;
     private final RoleQueryService roleQueryService;
     private final PasswordEncoder passwordEncoder;
@@ -82,8 +82,7 @@ public class AuthenticationServiceImpl implements AuthenticationService {
                     .map(role -> role.getName().name())
                     .toList();
 
-            String accessToken = jwtProvider.generateAccessToken(
-                    newUser.getUsername(),
+            String accessToken = jwtTokenProcessor.generateAccessToken(
                     newUser.getId(),
                     newUser.getEmail(),
                     roleNames
@@ -170,8 +169,7 @@ public class AuthenticationServiceImpl implements AuthenticationService {
             userRepository.save(user);
 
             // Generate Access Token
-            String accessToken = jwtProvider.generateAccessToken(
-                    principal.getUsername(),
+            String accessToken = jwtTokenProcessor.generateAccessToken(
                     principal.getId(),
                     principal.getEmail(),
                     principal.getListOfRoles()
@@ -263,7 +261,7 @@ public class AuthenticationServiceImpl implements AuthenticationService {
     private void blacklistAccessToken(String authHeader){
         if(authHeader != null){
             String accessToken = TokenUtils.validateAndExtractToken(authHeader);
-            Date tokenExpiration = jwtProvider.getExpirationDateFromToken(accessToken);
+            Date tokenExpiration = jwtTokenProcessor.getExpirationDateFromToken(accessToken);
             long remainingTtl = tokenExpiration.getTime() - System.currentTimeMillis();
 
             if (remainingTtl > 0) {
@@ -431,14 +429,13 @@ public class AuthenticationServiceImpl implements AuthenticationService {
         userRepository.save(user);
 
         // Generate new Access Token
-        String username = user.getUsername();
         Long userId = user.getId();
         String email = user.getEmail();
         List<String> userRoles = user.getRoles().stream()
                 .map(role -> role.getName().name())
                 .toList();
 
-        String accessToken = jwtProvider.generateAccessToken(username, userId, email, userRoles);
+        String accessToken = jwtTokenProcessor.generateAccessToken(userId, email, userRoles);
 
         // Set the Refresh token cookie
         cookiesManager.setRefreshTokenCookie(response, newRefreshToken.getToken());

@@ -15,7 +15,7 @@ import static org.springframework.web.bind.annotation.RequestMethod.*;
  * Provides user-friendly error messages when services are down
  *
  * @author LastCoderBoy
- * @since 2025-01-24
+ * @since 1.0.0
  */
 @RestController
 @RequestMapping("/fallback")

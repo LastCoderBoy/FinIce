@@ -1,9 +1,9 @@
 package com.jk.finice.authservice.config.security;
 
 
+import com.jk.finice.commonlibrary.dto.JwtClaimsPayload;
 import com.jk.finice.commonlibrary.exception.InternalServerException;
 import com.jk.finice.commonlibrary.exception.InvalidTokenException;
-import com.jk.finice.commonlibrary.utils.TokenUtils;
 import io.jsonwebtoken.*;
 import io.jsonwebtoken.io.Decoders;
 import io.jsonwebtoken.security.Keys;
@@ -13,17 +13,14 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
 import javax.crypto.SecretKey;
-import java.util.Date;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 import java.util.function.Function;
 
 import static com.jk.finice.commonlibrary.constants.AppConstants.*;
 
 @Component
 @Slf4j
-public class JwtProvider {
+public class JwtTokenProcessor {
 
     private SecretKey secretKey;
 
@@ -49,11 +46,10 @@ public class JwtProvider {
         }
     }
 
-    public String generateAccessToken(String username, Long userId, String email, List<String> roles) {
+    public String generateAccessToken(Long userId, String email, List<String> roles) {
         Map<String, Object> claims = new HashMap<>();
         claims.put(JWT_CLAIM_USER_ID, userId);
         claims.put(JWT_CLAIM_ROLES, roles);
-        claims.put(JWT_CLAIM_EMAIL, email);
         claims.put(JWT_CLAIM_TOKEN_TYPE, TOKEN_TYPE_ACCESS);
 
         Date now = new Date();
@@ -61,56 +57,38 @@ public class JwtProvider {
 
         return Jwts.builder()
                 .claims(claims)
-                .subject(username)
+                .subject(email)
                 .issuedAt(now)
                 .expiration(expiryDate)
                 .signWith(secretKey, Jwts.SIG.HS512)
                 .compact();
     }
 
-    /**
-     * Validate JWT token
-     * Checks signature, expiration, and format
-     *
-     * @param token JWT token string
-     * @return true if valid, false otherwise
-     */
-    public boolean validateToken(String token) {
-        try {
-            Jws<Claims> claims = Jwts
-                    .parser()
-                    .verifyWith(secretKey)
-                    .build().parseSignedClaims(token);
 
-            log.info("[AUTH-JWT-PROVIDER] JWT token is valid for user: {}", claims.getPayload().getSubject());
-            return true;
+    public Optional<JwtClaimsPayload> validateAndExtractClaims(String token) {
+        try {
+            Claims claims = Jwts.parser()
+                    .verifyWith(secretKey)
+                    .build()
+                    .parseSignedClaims(token)
+                    .getPayload();
+
+            String email = claims.getSubject();
+            Long userId = extractUserId(claims);
+            List<String> roles = getRolesFromToken(claims);
+
+            return Optional.of(new JwtClaimsPayload(userId, email, roles));
         } catch (ExpiredJwtException e) {
-            log.warn("[AUTH-JWT-PROVIDER] Token expired for user: {}",
-                    e.getClaims() != null ? e.getClaims().getSubject() : "unknown");
-            return false;
-        } catch (IllegalArgumentException e) {
-            log.warn("[AUTH-JWT-PROVIDER] JWT token compact of handler are invalid. {}", e.getMessage());
-            return false;
-        } catch (MalformedJwtException me) {
-            log.warn("[AUTH-JWT-PROVIDER] Malformed JWT token: {}", me.getMessage());
-            return false;
-        } catch (UnsupportedJwtException e) {
-            log.warn("[AUTH-JWT-PROVIDER] Unsupported JWT token: {}", e.getMessage());
-            return false;
-        } catch (Exception e) {
-            log.error("[AUTH-JWT-PROVIDER] Unexpected error occurred while verifying JWT token: {}", e.getMessage());
-            return false;
+            log.warn("[JWT-PROCESSOR] Token expired: {}", e.getMessage());
+            return Optional.empty();
+        } catch (JwtException e) {
+            log.warn("[JWT-PROCESSOR] Invalid token: {}", e.getMessage());
+            return Optional.empty();
         }
     }
 
-    // ==================== TOKEN EXTRACTION ====================
 
-    public String getUsernameFromToken(String token) {
-        return extractClaim(token, Claims::getSubject);
-    }
-
-    public Long getUserIdFromToken(String token) {
-        Claims claims = extractAllClaims(token);
+    private Long extractUserId(Claims claims) {
         Object userIdKey = claims.get(JWT_CLAIM_USER_ID);
 
         if (userIdKey instanceof Integer) {
@@ -124,14 +102,9 @@ public class JwtProvider {
         return null;
     }
 
-    public String getEmailFromToken(String token) {
-        return extractAllClaims(token).get(JWT_CLAIM_EMAIL, String.class);
-    }
-
     @SuppressWarnings("unchecked")
-    public List<String> getRolesFromToken(String token) {
+    public List<String> getRolesFromToken(Claims claims) {
         try {
-            Claims claims = extractAllClaims(token);
             Object roles = claims.get(JWT_CLAIM_ROLES);
 
             if (roles instanceof List) {
@@ -140,14 +113,9 @@ public class JwtProvider {
 
             return List.of();
         } catch (Exception e) {
-            log.error("[JWT-PROVIDER] Failed to extract roles: {}", e.getMessage());
-            return List.of();
+            log.error("[JWT-PROCESSOR] Failed to extract roles from token: {}", e.getMessage());
+            return List.of(); // Return empty list if roles not found
         }
-    }
-
-    public String getTokenType(String token) {
-        Claims claims = extractAllClaims(token);
-        return claims.get(JWT_CLAIM_TOKEN_TYPE, String.class);
     }
 
     public Date getExpirationDateFromToken(String token) {
@@ -173,29 +141,6 @@ public class JwtProvider {
         } catch (Exception e) {
             return true; // Consider invalid tokens as expired
         }
-    }
-
-    // ==================== HELPER METHODS ====================
-
-    private Claims extractAllClaims(String token) {
-        try {
-            return Jwts.parser()
-                    .verifyWith(secretKey)
-                    .build()
-                    .parseSignedClaims(token)
-                    .getPayload();
-        } catch (Exception e) {
-            log.error("[AUTH-JWT-PROVIDER] Failed to extract claims: {}", e.getMessage());
-            throw new RuntimeException("Invalid JWT token", e);
-        }
-    }
-
-    /**
-     * Extract specific claim from token
-     */
-    private <T> T extractClaim(String token, Function<Claims, T> claimResolver) {
-        final Claims claims = extractAllClaims(token);
-        return claimResolver.apply(claims);
     }
 }
 
