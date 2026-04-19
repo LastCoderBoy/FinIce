@@ -1,4 +1,4 @@
-package com.jk.finice.authservice.dto;
+package com.jk.finice.authservice.dto.request;
 
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
@@ -12,11 +12,6 @@ import lombok.*;
 @NoArgsConstructor
 @Builder
 public class RegisterRequest {
-
-    @NotBlank(message = "Username cannot be blank")
-    @Size(min = 3, max = 50, message = "Username must be between 3 and 50 characters")
-    @Pattern(regexp = "^[a-zA-Z0-9_-]+$", message = "Username can only contain letters, numbers, underscores, and hyphens")
-    private String username;
 
     @NotBlank(message = "Email is required")
     @Email(message = "Invalid email format")

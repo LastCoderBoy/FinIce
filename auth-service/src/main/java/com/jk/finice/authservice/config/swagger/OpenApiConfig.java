@@ -1,4 +1,4 @@
-package com.jk.finice.authservice.config.openApi;
+package com.jk.finice.authservice.config.swagger;
 
 import io.swagger.v3.oas.models.OpenAPI;
 import io.swagger.v3.oas.models.info.Contact;

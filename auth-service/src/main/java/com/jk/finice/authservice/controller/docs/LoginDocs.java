@@ -1,6 +1,6 @@
 package com.jk.finice.authservice.controller.docs;
 
-import com.jk.finice.authservice.dto.AuthResponse;
+import com.jk.finice.authservice.dto.response.AuthResponse;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.media.Content;
 import io.swagger.v3.oas.annotations.media.Schema;
@@ -17,7 +17,7 @@ import java.lang.annotation.Target;
 @Operation(
         summary = "User login",
         description = """
-                Authenticate user with username/email and password.
+                Authenticate user with email and password.
                 
                 **Returns:**
                 - JWT access token (in response body)

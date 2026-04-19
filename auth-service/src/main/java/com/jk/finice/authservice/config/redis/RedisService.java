@@ -2,9 +2,10 @@ package com.jk.finice.authservice.config.redis;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.jk.finice.authservice.dto.UserResponse;
+import com.jk.finice.authservice.dto.response.UserResponse;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.stereotype.Service;
 
@@ -13,12 +14,21 @@ import java.util.concurrent.TimeUnit;
 import static com.jk.finice.commonlibrary.constants.AppConstants.*;
 
 @Service
-@RequiredArgsConstructor
 @Slf4j
 public class RedisService {
 
-    private final RedisTemplate<String, String> redisTemplate;
+    private final RedisTemplate<String, String> stringRedisTemplate;
+
+    private final RedisTemplate<String, Object> redisTemplate;
     private final ObjectMapper objectMapper;
+
+    public RedisService(@Qualifier("blacklistRedisTemplate") RedisTemplate<String, String> stringRedisTemplate,
+                        RedisTemplate<String, Object> redisTemplate,
+                        ObjectMapper objectMapper) {
+        this.stringRedisTemplate = stringRedisTemplate;
+        this.redisTemplate = redisTemplate;
+        this.objectMapper = objectMapper;
+    }
 
     /**
      * Add token to blacklist
@@ -33,7 +43,7 @@ public class RedisService {
                 return;
             }
             String key = CACHE_TOKEN_BLACKLIST_PREFIX + token;
-            redisTemplate.opsForValue().set(key, "revoked", ttlMillis, TimeUnit.MILLISECONDS);
+            stringRedisTemplate.opsForValue().set(key, "revoked", ttlMillis, TimeUnit.MILLISECONDS);
             log.info("[REDIS-SERVICE] Blacklisted token: {}", token);
 
         } catch (Exception e) {
@@ -50,13 +60,7 @@ public class RedisService {
     public boolean isTokenBlacklisted(String token) {
         try{
             String key = CACHE_TOKEN_BLACKLIST_PREFIX + token;
-            Boolean existInCache = redisTemplate.hasKey(key);
-            if (Boolean.TRUE.equals(existInCache)) {
-                log.debug("[REDIS-SERVICE] Token found in blacklist");
-                return true;
-            }
-
-            return false;
+            return stringRedisTemplate.hasKey(key); // return true if key exists
         } catch (Exception e) {
             log.error("[REDIS-SERVICE] Error checking blacklist: {}", e.getMessage(), e);
             // Fail-safe: If Redis is down, allow the request
@@ -74,7 +78,7 @@ public class RedisService {
     public void removeTokenFromBlacklist(String token) {
         try {
             String key = CACHE_TOKEN_BLACKLIST_PREFIX + token;
-            redisTemplate.delete(key);
+            stringRedisTemplate.delete(key);
             log.info("[REDIS-SERVICE] Token removed from blacklist");
         } catch (Exception e) {
             log.error("[REDIS-SERVICE] Failed to remove token from blacklist: {}", e.getMessage(), e);
@@ -90,7 +94,7 @@ public class RedisService {
     public long getTokenBlacklistTTL(String token) {
         try {
             String key = CACHE_TOKEN_BLACKLIST_PREFIX + token;
-            Long ttl = redisTemplate.getExpire(key, TimeUnit.SECONDS);
+            Long ttl = stringRedisTemplate.getExpire(key, TimeUnit.SECONDS);
             return ttl != null ? ttl : -1;
         } catch (Exception e) {
             log.error("[REDIS-SERVICE] Failed to get TTL: {}", e.getMessage(), e);
@@ -113,13 +117,10 @@ public class RedisService {
     public void cacheUserProfile(Long userId, UserResponse userResponse) {
         try{
             String key = CACHE_USER_PROFILE_PREFIX + userId;
-            String jsonValue = objectMapper.writeValueAsString(userResponse);
-            redisTemplate.opsForValue().set(key, jsonValue, CACHE_USER_PROFILE_TTL, TimeUnit.MINUTES);
+            redisTemplate.opsForValue().set(key, userResponse, CACHE_USER_PROFILE_TTL, TimeUnit.MINUTES);
 
             log.info("[REDIS-SERVICE] Cached user profile for user ID: {}", userId);
 
-        } catch (JsonProcessingException e) {
-            log.error("[REDIS-SERVICE] Failed to serialize user profile: {}", e.getMessage(), e);
         } catch (Exception e) {
             log.error("[REDIS-SERVICE] Failed to cache user profile: {}", e.getMessage(), e);
         }
@@ -134,16 +135,13 @@ public class RedisService {
     public UserResponse getCachedUserProfile(Long userId) {
         try{
             String key = CACHE_USER_PROFILE_PREFIX + userId;
-            String jsonValue = redisTemplate.opsForValue().get(key);
-            if(jsonValue != null){
+            Object userObject = redisTemplate.opsForValue().get(key);
+            if(userObject != null){
                 log.info("[REDIS-SERVICE] Retrieved cached user profile for user ID: {}", userId);
-                return objectMapper.readValue(jsonValue, UserResponse.class);
+                return objectMapper.convertValue(userObject, UserResponse.class);
             }
 
             log.debug("[REDIS-SERVICE] Cache MISS for user: {}", userId);
-            return null;
-        } catch (JsonProcessingException je){
-            log.error("[REDIS-SERVICE] Failed to deserialize user profile: {}", je.getMessage(), je);
             return null;
         } catch (Exception e) {
             log.error("[REDIS-SERVICE] Failed to get cached user profile: {}", e.getMessage(), e);
@@ -166,17 +164,4 @@ public class RedisService {
             log.error("[REDIS-SERVICE] Failed to invalidate user profile: {}", e.getMessage());
         }
     }
-
-    /**
-     * Refresh user profile cache
-     * Update existing cache with new data
-     *
-     * @param userId User ID
-     * @param userResponse Updated user profile
-     */
-    public void refreshUserProfile(Long userId, UserResponse userResponse) {
-        invalidateUserProfile(userId); // Clear old cache
-        cacheUserProfile(userId, userResponse); // Set the new cache
-    }
-
 }

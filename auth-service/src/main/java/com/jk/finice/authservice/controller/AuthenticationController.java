@@ -2,7 +2,12 @@ package com.jk.finice.authservice.controller;
 
 
 import com.jk.finice.authservice.controller.docs.*;
-import com.jk.finice.authservice.dto.*;
+import com.jk.finice.authservice.dto.request.ChangePasswordRequest;
+import com.jk.finice.authservice.dto.request.LoginRequest;
+import com.jk.finice.authservice.dto.request.RegisterRequest;
+import com.jk.finice.authservice.dto.request.UpdateUserRequest;
+import com.jk.finice.authservice.dto.response.AuthResponse;
+import com.jk.finice.authservice.dto.response.UserResponse;
 import com.jk.finice.authservice.entity.UserPrincipal;
 import com.jk.finice.authservice.service.AuthenticationService;
 import com.jk.finice.commonlibrary.dto.ApiResponse;
@@ -40,7 +45,7 @@ public class AuthenticationController {
                                                               HttpServletRequest request) {
         // Base validation is done via @Valid annotation
         // processing the request to the service layer
-        log.info("[AUTH-CONTROLLER] Registering user: {}", registerRequest.getUsername());
+        log.info("[AUTH-CONTROLLER] Registering user: {}", registerRequest.getEmail());
 
         AuthResponse authResponse = authService.register(registerRequest, response, request);
 
@@ -65,7 +70,7 @@ public class AuthenticationController {
     public ResponseEntity<ApiResponse<AuthResponse>> login(@Valid @RequestBody LoginRequest loginRequest,
                                                            HttpServletRequest request,
                                                            HttpServletResponse response) {
-        log.info("[AUTH-CONTROLLER] Logging in user: {}", loginRequest.getUsernameOrEmail());
+        log.info("[AUTH-CONTROLLER] Logging in user: {}", loginRequest.getEmail());
 
         AuthResponse authResponse = authService.login(loginRequest, request, response);
         return ResponseEntity.ok(ApiResponse.success("User logged in successfully", authResponse));

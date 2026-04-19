@@ -1,6 +1,6 @@
 package com.jk.finice.authservice.controller.docs;
 
-import com.jk.finice.authservice.dto.UserResponse;
+import com.jk.finice.authservice.dto.response.UserResponse;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.media.Content;
 import io.swagger.v3.oas.annotations.media.Schema;
@@ -24,7 +24,7 @@ import java.lang.annotation.Target;
                 - Requires valid JWT token in Authorization header
                 
                 **Returns:**
-                - User details (id, username, email, name, roles, etc.)
+                - User details (id, email, name, roles, etc.)
                 - Account status and verification flags
                 """
         ,

@@ -1,6 +1,6 @@
 package com.jk.finice.authservice.controller.docs;
 
-import com.jk.finice.authservice.dto.UserResponse;
+import com.jk.finice.authservice.dto.response.UserResponse;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.media.Content;
 import io.swagger.v3.oas.annotations.media.Schema;
@@ -18,13 +18,12 @@ import java.lang.annotation.Target;
 @Operation(
         summary = "Update user profile",
         description = """
-                Update user's username, first name, last name, or phone number.
+                Update user's first name, last name, or phone number.
                 
                 **Authentication:**
                 - Requires valid JWT token
                 
                 **Updatable Fields:**
-                - Username
                 - First name
                 - Last name
                 - Phone number

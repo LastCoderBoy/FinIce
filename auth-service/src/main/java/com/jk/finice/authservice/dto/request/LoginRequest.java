@@ -1,4 +1,4 @@
-package com.jk.finice.authservice.dto;
+package com.jk.finice.authservice.dto.request;
 
 import jakarta.validation.constraints.NotBlank;
 import lombok.*;
@@ -10,8 +10,8 @@ import lombok.*;
 @Builder
 public class LoginRequest {
 
-    @NotBlank(message = "Username or email is required")
-    private String usernameOrEmail;
+    @NotBlank(message = "Email is required")
+    private String email;
 
     @NotBlank(message = "Password is required")
     private String password;

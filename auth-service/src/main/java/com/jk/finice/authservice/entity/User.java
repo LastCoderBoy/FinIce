@@ -14,14 +14,12 @@ import java.util.Set;
 @Table(
         name = "users",
         indexes = {
-                @Index(name = "idx_username", columnList = "username"),
                 @Index(name = "idx_email", columnList = "email"),
                 @Index(name = "idx_phone_numer", columnList = "phoneNumber"),
                 @Index(name = "idx_account_status", columnList = "account_status")
         },
         uniqueConstraints = {
         @UniqueConstraint(name = "uk_email", columnNames = "email"),
-        @UniqueConstraint(name = "uk_username", columnNames = "username"),
         @UniqueConstraint(name = "uk_phone_number", columnNames = "phoneNumber")
 })
 @Getter
@@ -35,14 +33,11 @@ public class User {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @Column(unique = true, nullable = false, length = 50)
-    private String username;
-
     @Column(unique = true, nullable = false, length = 100)
     private String email;
 
     @Column(nullable = false)
-    private String password; // BCrypt hashed
+    private String password; // Bcrypt hashed
 
     @Column(nullable = false, length = 50)
     private String firstName;
@@ -157,7 +152,7 @@ public class User {
         if(firstName != null && lastName != null){
             return firstName + " " + lastName;
         }
-        return username;
+        return firstName;
     }
 
     // The MFA Logic might be considered later

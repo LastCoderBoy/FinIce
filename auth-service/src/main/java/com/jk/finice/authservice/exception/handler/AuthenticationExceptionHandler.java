@@ -13,6 +13,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.security.authentication.BadCredentialsException;
+import org.springframework.security.authentication.DisabledException;
 import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.validation.FieldError;
 import org.springframework.web.bind.MethodArgumentNotValidException;
@@ -109,6 +110,16 @@ public class AuthenticationExceptionHandler {
     @ExceptionHandler(AccountNotVerifiedException.class)
     public ResponseEntity<ApiResponse<Void>> handleAccountNotVerifiedException(AccountNotVerifiedException ex) {
         log.error("[AUTH-EXCEPTION-HANDLER] Account not verified: {}", ex.getMessage());
+
+        return ResponseEntity
+                .status(HttpStatus.FORBIDDEN)
+                .body(ApiResponse.error(ex.getMessage()));
+    }
+
+    // Thrown when the user account is Not Active or Email is Not Verified
+    @ExceptionHandler(DisabledException.class)
+    public ResponseEntity<ApiResponse<Void>> handleAccountDisabledException(DisabledException ex) {
+        log.error("[AUTH-EXCEPTION-HANDLER] Account disabled: {}", ex.getMessage());
 
         return ResponseEntity
                 .status(HttpStatus.FORBIDDEN)

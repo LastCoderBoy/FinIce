@@ -3,7 +3,12 @@ package com.jk.finice.authservice.service.impl;
 import com.jk.finice.authservice.config.AuthCookiesManager;
 import com.jk.finice.authservice.config.redis.RedisService;
 import com.jk.finice.authservice.config.security.JwtTokenProcessor;
-import com.jk.finice.authservice.dto.*;
+import com.jk.finice.authservice.dto.request.ChangePasswordRequest;
+import com.jk.finice.authservice.dto.request.LoginRequest;
+import com.jk.finice.authservice.dto.request.RegisterRequest;
+import com.jk.finice.authservice.dto.request.UpdateUserRequest;
+import com.jk.finice.authservice.dto.response.AuthResponse;
+import com.jk.finice.authservice.dto.response.UserResponse;
 import com.jk.finice.authservice.service.email.EmailService;
 import com.jk.finice.authservice.entity.*;
 import com.jk.finice.authservice.enums.AccountStatus;
@@ -64,9 +69,13 @@ public class AuthenticationServiceImpl implements AuthenticationService {
     @Override
     public AuthResponse register(RegisterRequest registerRequest, HttpServletResponse response, HttpServletRequest request) {
         try {
-            log.info("[AUTH-SERVICE] Starting registration for user: {}", registerRequest.getUsername());
+            log.info("[AUTH-SERVICE] Starting registration for user: {}", registerRequest.getEmail());
 
-            validateUsernameAndEmail(registerRequest.getUsername(), registerRequest.getEmail());
+            // Check email exist in our database or not
+            if (userRepository.existsByEmail(registerRequest.getEmail())) {
+                log.warn("[AUTH-SERVICE] User with email {} already exists", registerRequest.getEmail());
+                throw new DuplicateResourceFoundException("User with email " + registerRequest.getEmail() + " already exists");
+            }
 
             // Extract Headers
             String clientIP = HeaderExtractor.extractClientIp(request);
@@ -150,7 +159,7 @@ public class AuthenticationServiceImpl implements AuthenticationService {
         try {
             Authentication authentication = authenticationManager
                     .authenticate(new UsernamePasswordAuthenticationToken(
-                            loginRequest.getUsernameOrEmail(),
+                            loginRequest.getEmail(),
                             loginRequest.getPassword()));
 
             UserPrincipal principal = (UserPrincipal) authentication.getPrincipal();
@@ -188,13 +197,13 @@ public class AuthenticationServiceImpl implements AuthenticationService {
             return mapToAuthResponse(user, accessToken);
 
         } catch (DisabledException e) {
-            log.warn("[AUTH-SERVICE] Account is not verified: {}", loginRequest.getUsernameOrEmail());
+            log.warn("[AUTH-SERVICE] Account is not verified: {}", loginRequest.getEmail());
 
             throw new AccountNotVerifiedException("Account is still Pending. Please verify your email first.");
         } catch (AuthenticationException e) {
             log.warn("[AUTH-SERVICE] Login failed: {}", e.getMessage());
 
-            updateFailedLoginAttempts(loginRequest.getUsernameOrEmail());
+            updateFailedLoginAttempts(loginRequest.getEmail());
             throw new UnauthorizedException("Invalid credentials");
         } catch (AccountLockedException e) {
             log.warn("[AUTH-SERVICE] Account is locked: {}", e.getMessage());
@@ -202,33 +211,6 @@ public class AuthenticationServiceImpl implements AuthenticationService {
         } catch (Exception e) {
             log.error("[AUTH-SERVICE] Unexpected error during login: {}", e.getMessage(), e);
             throw new InternalServerException("Unexpected error occurred!");
-        }
-    }
-
-    private void updateFailedLoginAttempts(String usernameOrEmail) {
-        try {
-            Optional<User> optionalUser = userRepository.findByUsernameOrEmail(usernameOrEmail);
-            if(optionalUser.isPresent()){
-                User user = optionalUser.get();
-                user.incrementFailedLoginAttempts();
-                userRepository.save(user);
-
-                if(user.getFailedLoginAttempts() == 4){
-                    throw new UnauthorizedException("Account will be locked after 1 more failed attempt");
-                }
-
-                if (user.getAccountLocked()) {
-                    log.warn("[AUTH-SERVICE] Account locked due to failed attempts: {} (ID: {})",
-                            user.getUsername(), user.getId());
-                    throw new AccountLockedException("Account is locked for 30 minutes due to failed attempts");
-                }
-            }
-        } catch (UnauthorizedException | AccountLockedException e) {
-            // Re-throw
-            throw e;
-        } catch (Exception e) {
-            log.error("[AUTH-SERVICE] Failed to update login attempts: {}", e.getMessage());
-            // Don't fail login process if this fails
         }
     }
 
@@ -258,145 +240,53 @@ public class AuthenticationServiceImpl implements AuthenticationService {
         }
     }
 
-    private void blacklistAccessToken(String authHeader){
-        if(authHeader != null){
-            String accessToken = TokenUtils.validateAndExtractToken(authHeader);
-            Date tokenExpiration = jwtTokenProcessor.getExpirationDateFromToken(accessToken);
-            long remainingTtl = tokenExpiration.getTime() - System.currentTimeMillis();
-
-            if (remainingTtl > 0) {
-                redisService.blackListToken(accessToken, remainingTtl);
-                log.debug("[AUTH-SERVICE] Access token blacklisted for {}ms", remainingTtl);
-            } else {
-                log.debug("[AUTH-SERVICE] Access token already expired, skipping blacklist");
-            }
-        }
-    }
-
     @Override
     @Transactional(rollbackFor = Exception.class)
     public UserResponse updateUserProfile(UpdateUserRequest updateUserRequest,
                                           UserPrincipal principal,
                                           HttpServletRequest request, HttpServletResponse response) {
-        try{
-            if(!updateUserRequest.isAtLeastOneFieldProvided()){
-                throw new ValidationException("At least one field must be provided for update");
-            }
-            User user = findUserById(principal.getId());
+        User user = findUserById(principal.getId());
 
-            populateEntityWithLatestData(user, updateUserRequest);
+        populateEntityWithLatestData(user, updateUserRequest);
 
-            user = userRepository.save(user);
-            log.info("[AUTH-SERVICE] User profile updated successfully for user: {}", principal.getUsername());
+        user = userRepository.save(user);
+        log.info("[AUTH-SERVICE] User profile updated successfully for user: {}", principal.getUsername());
 
-            // Invalidate and refresh cache after update
-            redisService.refreshUserProfile(user.getId(), mapToUserResponse(user));
+        // Caching the entity will overwrite the existing cache
+        redisService.cacheUserProfile(user.getId(), mapToUserResponse(user));
 
-            return mapToUserResponse(user);
-
-        } catch (DuplicateResourceFoundException | ValidationException de){
-            throw de;
-        } catch (Exception e){
-            log.error("[AUTH-SERVICE] Unexpected error occurred while updating user profile: {}", e.getMessage());
-            throw new InternalServerException("Unexpected error occurred!");
-        }
-    }
-
-    private void populateEntityWithLatestData(User userEntity, UpdateUserRequest updateUserRequest) {
-
-        if(updateUserRequest.getUsername() != null &&
-                !updateUserRequest.getUsername().equals(userEntity.getUsername())){
-
-            boolean alreadyPresent = userRepository.existsByUsername(updateUserRequest.getUsername());
-            if(alreadyPresent){
-                log.warn("[AUTH-SERVICE] Username {} already exists", updateUserRequest.getUsername());
-                throw new DuplicateResourceFoundException("Username already exists");
-            }
-            userEntity.setUsername(updateUserRequest.getUsername());
-        }
-
-        if(updateUserRequest.getFirstName() != null){
-            userEntity.setFirstName(updateUserRequest.getFirstName());
-        }
-        if(updateUserRequest.getLastName() != null){
-            userEntity.setLastName(updateUserRequest.getLastName());
-        }
-        if(updateUserRequest.getPhoneNumber() != null){
-            userEntity.setPhoneNumber(updateUserRequest.getPhoneNumber());
-        }
+        return mapToUserResponse(user);
     }
 
     @Override
     @Transactional(rollbackFor = Exception.class)
     public void changePassword(ChangePasswordRequest passwordRequest, UserPrincipal principal, HttpServletResponse response) {
-        try{
-            User userEntity = findUserById(principal.getId());
-            String savedPassword = userEntity.getPassword();
-            boolean isCurrentPasswordValid = passwordEncoder.matches(passwordRequest.getCurrentPassword(), savedPassword);
-            if(!isCurrentPasswordValid){
-                throw new BadCredentialsException("Current password is incorrect");
-            }
+        User userEntity = findUserById(principal.getId());
+        String savedPassword = userEntity.getPassword();
 
-            // checks the match of the new password and confirm password
-            if(!passwordRequest.isPasswordsMatch()){
-                throw new ValidationException("Confirm password does not match with the new password");
-            }
-
-            if (passwordEncoder.matches(passwordRequest.getNewPassword(), savedPassword)) {
-                throw new ValidationException("New password must be different from current password");
-            }
-
-            userEntity.setPassword(passwordEncoder.encode(passwordRequest.getNewPassword()));
-            userEntity.setPasswordChangedAt(LocalDateTime.now());
-            userRepository.save(userEntity);
-
-            cookiesManager.clearRefreshTokenCookie(response);
-            log.debug("[AUTH-SERVICE] Refresh token cookie cleared");
-
-            refreshTokenService.revokeAllRefreshTokensAsync(principal.getId());
-
-            log.info("[AUTH-SERVICE] Password changed successfully for user: {} (ID: {})",
-                    principal.getUsername(), principal.getId());
-        } catch (BadCredentialsException | ValidationException e) {
-            log.warn("[AUTH-SERVICE] Password change failed for user {}: {}",
-                    principal.getUsername(), e.getMessage());
-            throw e;
-        } catch (ResourceNotFoundException e) {
-            log.error("[AUTH-SERVICE] User not found during password change: {}", e.getMessage());
-            throw e;
-        } catch (Exception e){
-            log.error("[AUTH-SERVICE] Unexpected error occurred while changing password: {}", e.getMessage());
-            throw new InternalServerException("Unexpected error occurred!");
+        // Check: Current entered password is same as the one in DB
+        boolean isCurrentPasswordValid = passwordEncoder.matches(passwordRequest.getCurrentPassword(), savedPassword);
+        if(!isCurrentPasswordValid){
+            throw new BadCredentialsException("Current password is incorrect");
         }
-    }
 
-    /**
-     * Logout from all devices asynchronously
-     * Runs AFTER response is sent to client
-     *
-     * @param userId User ID
-     * @param authHeader Authorization header (contains current access token)
-     */
-    @Transactional
-    public void logoutAll(Long userId, String authHeader) {
-        try{
-            // Revoke Refresh Token
-            refreshTokenService.revokeAllRefreshTokensAsync(userId);
-
-            // Blacklist the Access Token in Redis
-            if (authHeader != null) {
-                blacklistAccessToken(authHeader);
-            } else {
-                log.warn("[AUTH-SERVICE] No authorization header found for blacklisting");
-            }
-
-            log.info("[AUTH-SERVICE] Logout all successful for user ID: {}", userId);
-
-        } catch (Exception e){
-            // Don't throw - this is async, exceptions are logged by AsyncUncaughtExceptionHandler
-            log.error("[AUTH-SERVICE] Error during async logout for user {}: {}",
-                    userId, e.getMessage(), e);
+        // Check: New password must be different from current password
+        if (passwordEncoder.matches(passwordRequest.getNewPassword(), savedPassword)) {
+            throw new ValidationException("New password must be different from current password");
         }
+
+        // Update password and related field
+        userEntity.setPassword(passwordEncoder.encode(passwordRequest.getNewPassword()));
+        userEntity.setPasswordChangedAt(LocalDateTime.now());
+        userRepository.save(userEntity);
+
+        cookiesManager.clearRefreshTokenCookie(response);
+        log.debug("[AUTH-SERVICE] Refresh token cookie cleared");
+
+        refreshTokenService.revokeAllRefreshTokensAsync(principal.getId());
+
+        log.info("[AUTH-SERVICE] Password changed successfully for user: {} (ID: {})",
+                principal.getUsername(), principal.getId());
     }
 
     @Override
@@ -443,6 +333,95 @@ public class AuthenticationServiceImpl implements AuthenticationService {
         return mapToAuthResponse(user, accessToken);
     }
 
+    /**
+     * Logout from all devices asynchronously
+     * Runs AFTER response is sent to client
+     *
+     * @param userId User ID
+     * @param authHeader Authorization header (contains current access token)
+     */
+    @Transactional
+    public void logoutAll(Long userId, String authHeader) {
+        try{
+            // Revoke Refresh Token
+            refreshTokenService.revokeAllRefreshTokensAsync(userId);
+
+            // Blacklist the Access Token in Redis
+            if (authHeader != null) {
+                blacklistAccessToken(authHeader);
+            } else {
+                log.warn("[AUTH-SERVICE] No authorization header found for blacklisting");
+            }
+
+            log.info("[AUTH-SERVICE] Logout all successful for user ID: {}", userId);
+
+        } catch (Exception e){
+            // Don't throw - this is async, exceptions are logged by AsyncUncaughtExceptionHandler
+            log.error("[AUTH-SERVICE] Error during async logout for user {}: {}",
+                    userId, e.getMessage(), e);
+        }
+    }
+
+    // ====================================================
+    //                  HELPER METHODS
+    //=====================================================
+
+    private void updateFailedLoginAttempts(String email) {
+        try {
+            Optional<User> optionalUser = userRepository.findByEmail(email);
+            if(optionalUser.isPresent()){
+                User user = optionalUser.get();
+                user.incrementFailedLoginAttempts();
+                userRepository.save(user);
+
+                if(user.getFailedLoginAttempts() == 4){
+                    throw new UnauthorizedException("Account will be locked after 1 more failed attempt");
+                }
+
+                if (user.getAccountLocked()) {
+                    log.warn("[AUTH-SERVICE] Account locked due to failed attempts: {} (ID: {})",
+                            user.getEmail(), user.getId());
+                    throw new AccountLockedException("Account is locked for 30 minutes due to failed attempts");
+                }
+            }
+        } catch (UnauthorizedException | AccountLockedException e) {
+            // Re-throw
+            throw e;
+        } catch (Exception e) {
+            log.error("[AUTH-SERVICE] Failed to update login attempts: {}", e.getMessage());
+            // Don't fail login process if this fails
+        }
+    }
+
+    private void blacklistAccessToken(String authHeader){
+        if(authHeader != null){
+            String accessToken = TokenUtils.validateAndExtractToken(authHeader);
+            Date tokenExpiration = jwtTokenProcessor.getExpirationDateFromToken(accessToken);
+            long remainingTtl = tokenExpiration.getTime() - System.currentTimeMillis();
+
+            if (remainingTtl > 0) {
+                redisService.blackListToken(accessToken, remainingTtl);
+                log.debug("[AUTH-SERVICE] Access token blacklisted for {}ms", remainingTtl);
+            } else {
+                log.debug("[AUTH-SERVICE] Access token already expired, skipping blacklist");
+            }
+        }
+    }
+
+
+    private void populateEntityWithLatestData(User userEntity, UpdateUserRequest updateRequest) {
+
+        if(updateRequest.getFirstName() != null){
+            userEntity.setFirstName(updateRequest.getFirstName());
+        }
+        if(updateRequest.getLastName() != null){
+            userEntity.setLastName(updateRequest.getLastName());
+        }
+        if(updateRequest.getPhoneNumber() != null){
+            userEntity.setPhoneNumber(updateRequest.getPhoneNumber());
+        }
+    }
+
     private void validateUserAccountForTokenRefresh(User user) {
         if(user.getAccountStatus() == AccountStatus.CLOSED ||
                 user.getAccountStatus() == AccountStatus.SUSPENDED){
@@ -460,11 +439,10 @@ public class AuthenticationServiceImpl implements AuthenticationService {
     }
 
 
-        private User createUserEntity(RegisterRequest registerRequest, String clientIP) {
+    private User createUserEntity(RegisterRequest registerRequest, String clientIP) {
         Role defaultRole = roleQueryService.getOrCreateDefaultRole(); // ROLE_USER
 
         User newUser = User.builder()
-                .username(registerRequest.getUsername())
                 .email(registerRequest.getEmail())
                 .password(passwordEncoder.encode(registerRequest.getPassword())) // Hash password
                 .firstName(registerRequest.getFirstName())
@@ -481,25 +459,15 @@ public class AuthenticationServiceImpl implements AuthenticationService {
 
         newUser.addRole(defaultRole);
 
-        log.info("[AUTH-SERVICE] User Object with username: {} is populated successfully", registerRequest.getUsername());
+        log.info("[AUTH-SERVICE] User Object with email: {} is populated successfully", registerRequest.getEmail());
         return newUser;
-    }
-
-    private void validateUsernameAndEmail(String username, String email) {
-        boolean isUserExist = userRepository.existsByUsername(username);
-        if (isUserExist) {
-            log.warn("[AUTH-SERVICE] User with username {} already exists", username);
-            throw new DuplicateResourceFoundException("User with username " + username + " already exists");
-        }
-        boolean isEmailExist = userRepository.existsByEmail(email);
-        if (isEmailExist) {
-            log.warn("[AUTH-SERVICE] User with email {} already exists", email);
-            throw new DuplicateResourceFoundException("User with email " + email + " already exists");
-        }
     }
 
     private User findUserById(Long userId){
         return userRepository.findById(userId)
-                .orElseThrow(() -> new ResourceNotFoundException("User not found with ID: " + userId));
+                .orElseThrow(() -> {
+                    log.warn("[AUTH-SERVICE] User not found with ID: {}", userId);
+                    return new ResourceNotFoundException("User not found");
+                });
     }
 }

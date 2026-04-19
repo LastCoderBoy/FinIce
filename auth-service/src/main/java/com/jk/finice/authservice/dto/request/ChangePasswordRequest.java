@@ -1,4 +1,4 @@
-package com.jk.finice.authservice.dto;
+package com.jk.finice.authservice.dto.request;
 
 import jakarta.validation.constraints.AssertTrue;
 import jakarta.validation.constraints.NotBlank;

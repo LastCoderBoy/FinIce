@@ -1,7 +1,7 @@
 package com.jk.finice.authservice.mapper;
 
-import com.jk.finice.authservice.dto.AuthResponse;
-import com.jk.finice.authservice.dto.UserResponse;
+import com.jk.finice.authservice.dto.response.AuthResponse;
+import com.jk.finice.authservice.dto.response.UserResponse;
 import com.jk.finice.authservice.entity.User;
 
 import java.util.stream.Collectors;
@@ -13,7 +13,6 @@ public class UserMapper {
     public static AuthResponse mapToAuthResponse(User user, String accessToken){
         AuthResponse.UserInfo userInfo = AuthResponse.UserInfo.builder()
                 .id(user.getId())
-                .username(user.getUsername())
                 .email(user.getEmail())
                 .firstName(user.getFirstName())
                 .lastName(user.getLastName())
@@ -34,7 +33,6 @@ public class UserMapper {
     public static UserResponse mapToUserResponse(User user){
         return UserResponse.builder()
                 .id(user.getId())
-                .username(user.getUsername())
                 .email(user.getEmail())
                 .firstName(user.getFirstName())
                 .lastName(user.getLastName())

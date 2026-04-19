@@ -1,6 +1,6 @@
 package com.jk.finice.authservice.controller.docs;
 
-import com.jk.finice.authservice.dto.AuthResponse;
+import com.jk.finice.authservice.dto.response.AuthResponse;
 
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.media.Content;
@@ -17,7 +17,7 @@ import java.lang.annotation.Target;
 @Retention(RetentionPolicy.RUNTIME)
 @Operation(
         summary = "Register new user",
-        description = "Create a new user account with email, username, and password. " +
+        description = "Create a new user account with email, and password. " +
                 "Returns JWT access token and refresh token cookie."
 )
 @ApiResponses(value = {
@@ -28,7 +28,7 @@ import java.lang.annotation.Target;
         ),
         @ApiResponse(
                 responseCode = "400",
-                description = "Invalid input or duplicate username/email",
+                description = "Invalid input or duplicate email",
                 content = @Content(schema = @Schema(implementation = com.jk.finice.commonlibrary.dto.ApiResponse.class))
         )
 })

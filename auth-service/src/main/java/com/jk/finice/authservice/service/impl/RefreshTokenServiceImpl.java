@@ -44,7 +44,7 @@ public class RefreshTokenServiceImpl implements RefreshTokenService {
 
             refreshToken = refreshTokenRepository.save(refreshToken);
             log.info("[REFRESH-TOKEN-SERVICE] Created refresh token for user: {} (ID: {})",
-                    user.getUsername(), user.getId());
+                    user.getEmail(), user.getId());
 
             return refreshToken;
         } catch (Exception e) {
@@ -89,7 +89,7 @@ public class RefreshTokenServiceImpl implements RefreshTokenService {
         refreshTokenRepository.save(oldToken);
 
         log.info("[REFRESH-TOKEN-SERVICE] Rotated refresh token for user: {}",
-                oldToken.getUser().getUsername());
+                oldToken.getUser().getEmail());
 
         return createRefreshToken(oldToken.getUser(), clientIP, userAgent);
     }
@@ -100,7 +100,7 @@ public class RefreshTokenServiceImpl implements RefreshTokenService {
         RefreshToken refreshToken = findByToken(token);
         refreshToken.revoke();
         refreshTokenRepository.save(refreshToken);
-        log.info("[REFRESH-TOKEN-SERVICE] Revoked refresh token for user: {}", refreshToken.getUser().getUsername());
+        log.info("[REFRESH-TOKEN-SERVICE] Revoked refresh token for user: {}", refreshToken.getUser().getEmail());
     }
 
     /**

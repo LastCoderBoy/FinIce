@@ -1,9 +1,8 @@
-package com.jk.finice.authservice.dto;
+package com.jk.finice.authservice.dto.response;
 
 import lombok.*;
 
 import java.util.List;
-import java.util.Set;
 
 @Getter
 @Setter
@@ -24,7 +23,6 @@ public class AuthResponse {
     @Builder
     public static class UserInfo {
         private Long id;
-        private String username;
         private String email;
         private String firstName;
         private String lastName;

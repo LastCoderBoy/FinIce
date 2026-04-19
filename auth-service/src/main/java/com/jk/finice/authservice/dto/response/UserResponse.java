@@ -1,4 +1,4 @@
-package com.jk.finice.authservice.dto;
+package com.jk.finice.authservice.dto.response;
 
 import lombok.*;
 
@@ -13,7 +13,6 @@ import java.util.Set;
 public class UserResponse {
 
     private Long id;
-    private String username;
     private String email;
     private String firstName;
     private String lastName;
