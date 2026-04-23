@@ -1,4 +1,4 @@
-package com.jk.finice.accountservice.dto.client;
+package com.jk.finice.transactionservice.dto.client;
 
 import lombok.AllArgsConstructor;
 import lombok.Getter;
@@ -13,5 +13,5 @@ import java.math.BigDecimal;
 @NoArgsConstructor
 public class DebitRequest {
     private BigDecimal amount;
-    private String transactionId; // for audit logging on account-service side
+    private String transactionId;
 }

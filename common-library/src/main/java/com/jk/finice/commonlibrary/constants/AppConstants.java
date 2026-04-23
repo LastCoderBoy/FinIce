@@ -13,12 +13,13 @@ public final class AppConstants {
     public static final String AUTHORIZATION_HEADER = "Authorization";
     public static final String CORRELATION_ID_HEADER = "X-Correlation-ID";
     public static final String REQUEST_ID_HEADER = "X-Request-ID";
-    public static final String SERVICE_NAME_HEADER = "X-Service-Name";
+    public static final String SERVICE_KEY_HEADER = "X-Internal-Service";
     public static final String USER_AGENT_HEADER = "User-Agent";
     public static final String IP_ADDRESS_HEADER = "X-Forwarded-For";
     public static final String USER_ID_HEADER = "X-User-ID";
     public static final String USER_ROLES_HEADER = "X-User-Roles";
     public static final String USER_EMAIL_HEADER = "X-User-Email";
+    public static final String IDEMPOTENCY_HEADER = "X-Idempotency-Key";
 
     // ========== Service Names ==========
     public static final String EUREKA_SERVER = "eureka-server";

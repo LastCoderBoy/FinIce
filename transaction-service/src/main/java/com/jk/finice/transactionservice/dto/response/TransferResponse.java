@@ -2,6 +2,7 @@ package com.jk.finice.transactionservice.dto.response;
 
 import com.fasterxml.jackson.annotation.JsonInclude;
 import com.jk.finice.commonlibrary.enums.Currency;
+import com.jk.finice.transactionservice.entity.Transaction;
 import com.jk.finice.transactionservice.enums.TransactionStatus;
 import com.jk.finice.transactionservice.enums.TransactionType;
 import lombok.*;

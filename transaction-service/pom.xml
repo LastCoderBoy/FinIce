@@ -56,6 +56,14 @@
             <artifactId>spring-cloud-starter-netflix-eureka-client</artifactId>
         </dependency>
 
+        <!-- OpenFeign for Internal Service Communication -->
+        <dependency>
+            <groupId>org.springframework.cloud</groupId>
+            <artifactId>spring-cloud-starter-openfeign</artifactId>
+            <version>4.3.0</version>
+            <scope>compile</scope>
+        </dependency>
+
         <!-- Load Balancer -->
         <dependency>
             <groupId>org.springframework.cloud</groupId>

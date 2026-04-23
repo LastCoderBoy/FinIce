@@ -64,13 +64,21 @@ public class Transaction {
     @Column( name = "transaction_type", nullable = false, length = 20)
     private TransactionType transactionType;
 
-    // ============ Account Details (IDs from account-service) ============
+    // ============ Account Details ============
 
     @Column(name = "source_account_id", nullable = false)
     private Long sourceAccountId;
 
     @Column(name = "destination_account_id")
     private Long destinationAccountId;
+
+    // IBAN snapshot
+    @Column(name = "sender_iban", nullable = false, length = 34)
+    private String senderIban;
+
+    @Column(name = "receiver_iban", length = 34)
+    private String receiverIban;  // nullable for DEPOSIT (no sender outside system)
+
 
     // ============ Money Details ============
     @Column(name = "amount", precision = 19, scale = 2, nullable = false)
@@ -106,11 +114,8 @@ public class Transaction {
     private LocalDateTime completedAt;
 
     // ============ Audit ============
-    /**
-     * User ID who initiated the transaction
-     */
     @Column(name = "created_by", nullable = false)
-    private Long createdBy;
+    private Long createdBy;             // User ID who initiated the transaction
 
     // ============================================
     // Helper Methods

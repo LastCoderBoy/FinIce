@@ -1,86 +1,47 @@
 package com.jk.finice.transactionservice.service.client;
 
-import com.jk.finice.transactionservice.exception.AccountClientException;
-import lombok.RequiredArgsConstructor;
-import lombok.extern.slf4j.Slf4j;
-import org.springframework.core.ParameterizedTypeReference;
-import org.springframework.http.HttpStatus;
-import org.springframework.http.HttpStatusCode;
-import org.springframework.stereotype.Component;
-import org.springframework.web.reactive.function.client.WebClient;
-import reactor.core.publisher.Mono;
-import reactor.util.retry.Retry;
 
-import java.time.Duration;
+import com.jk.finice.transactionservice.dto.client.AccountClientResponse;
+import com.jk.finice.transactionservice.dto.client.CreditRequest;
+import com.jk.finice.transactionservice.dto.client.DebitRequest;
+import com.jk.finice.transactionservice.dto.client.HoldRequest;
+import org.springframework.cloud.openfeign.FeignClient;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PutMapping;
+import org.springframework.web.bind.annotation.RequestBody;
 
 import static com.jk.finice.commonlibrary.constants.AppConstants.ACCOUNT_PATH;
-import static com.jk.finice.commonlibrary.constants.AppConstants.USER_ID_HEADER;
 
+@FeignClient(name = "account-service", path = ACCOUNT_PATH)
+public interface AccountServiceClient {
 
-@Component
-@RequiredArgsConstructor
-@Slf4j
-public class AccountServiceClient {
+    // The Headers are added by the Feign RequestInterceptor Config class for each request.
 
-    private final WebClient.Builder webClientBuilder;
-    private static final String ACCOUNT_SERVICE_URL = "lb://account-service";
+    @GetMapping("/internal/{accountId}")
+    AccountClientResponse getAccountInternal(@PathVariable Long accountId);
 
-    /**
-     * Get account details by ID
-     *
-     * @param accountId Account ID
-     * @param userId User ID (for ownership check)
-     * @return Lightweight account details (AccountDto)
-     */
-    public AccountDto getAccount(Long accountId, Long userId) {
-        log.debug("[ACCOUNT-CLIENT] Fetching account {} for user {}", accountId, userId);
+    @PutMapping("/internal/{accountId}/hold")
+    void placeHold(@PathVariable Long accountId,
+                   @RequestBody HoldRequest request);
 
-        try {
-            // Use ParameterizedTypeReference to preserve generic type
-            ApiResponse<AccountDto> response = webClientBuilder.build()
-                    .get()
-                    .uri(ACCOUNT_SERVICE_URL + ACCOUNT_PATH + "/{accountId}", accountId)
-                    .header(USER_ID_HEADER, userId.toString())
-                    .retrieve()
-                    .onStatus(HttpStatusCode::is4xxClientError, clientResponse -> {
-                        HttpStatus status = HttpStatus.valueOf(clientResponse.statusCode().value());
-                        return clientResponse.bodyToMono(String.class)
-                                .flatMap(body -> {
-                                    log.error("[ACCOUNT-CLIENT] 4xx error ({}): {}", status.value(), body);
-                                    // ✅ Preserve original status code
-                                    return Mono.error(new AccountClientException(
-                                            "Account error: " + body, status));
-                                });
-                    })
-                    .onStatus(HttpStatusCode::is5xxServerError, clientResponse -> {
-                        log.error("[ACCOUNT-CLIENT] Account service unavailable");
-                        // ✅ Return 503 for downstream service failures
-                        return Mono.error(new AccountClientException(
-                                "Account service unavailable",
-                                HttpStatus.SERVICE_UNAVAILABLE));
-                    })
-                    // ✅ ParameterizedTypeReference preserves ApiResponse<AccountDto>
-                    .bodyToMono(new ParameterizedTypeReference<ApiResponse<AccountDto>>() {})
-                    .timeout(Duration.ofSeconds(5))
-                    .retryWhen(Retry.backoff(2, Duration.ofMillis(500)))
-                    .block();
+    @PutMapping("/internal/{accountId}/debit")
+    void debitAccount(@PathVariable Long accountId,
+                      @RequestBody DebitRequest request);
 
-            if (response != null && response.isSuccess()) {
-                log.debug("[ACCOUNT-CLIENT] Successfully fetched account {}", accountId);
-                return response.getData();  // ✅ Type-safe AccountDto
-            }
+    @PutMapping("/internal/{accountId}/credit")
+    void creditAccount(@PathVariable Long accountId,
+                       @RequestBody CreditRequest request);
 
-            throw new AccountClientException(
-                    "Failed to fetch account: " + accountId,
-                    HttpStatus.INTERNAL_SERVER_ERROR);
+    @PutMapping("/internal/{accountId}/release-hold")
+    void releaseHold(@PathVariable Long accountId,
+                     @RequestBody HoldRequest request);
 
-        } catch (AccountClientException e) {
-            throw e;  // Re-throw with preserved status code
-        } catch (Exception e) {
-            log.error("[ACCOUNT-CLIENT] Unexpected error: {}", e.getMessage());
-            throw new AccountClientException(
-                    "Failed to communicate with account service",
-                    HttpStatus.INTERNAL_SERVER_ERROR, e);
-        }
-    }
+    @PutMapping("/internal/{accountId}/reverse-debit")
+    void reverseDebit(@PathVariable Long accountId,
+                      @RequestBody DebitRequest request);
+
+    @PutMapping("/internal/{accountId}/reverse-credit")
+    void reverseCredit(@PathVariable Long accountId,
+                       @RequestBody CreditRequest request);
 }
