@@ -1,5 +1,9 @@
 package com.jk.finice.accountservice.service;
 
+import com.jk.finice.accountservice.dto.client.AccountInternalResponse;
+import com.jk.finice.accountservice.dto.client.CreditRequest;
+import com.jk.finice.accountservice.dto.client.DebitRequest;
+import com.jk.finice.accountservice.dto.client.HoldRequest;
 import com.jk.finice.accountservice.dto.request.CloseAccountRequest;
 import com.jk.finice.accountservice.dto.request.CreateAccountRequest;
 import com.jk.finice.accountservice.dto.request.UpdateAccountRequest;
@@ -26,5 +30,17 @@ public interface AccountService {
 
     void closeAccount(Long accountId, CloseAccountRequest closeAccountRequest, Long userId);
 
+    AccountInternalResponse getAccountInternal(Long accountId, String serviceKey);
 
+    void placeHold(Long accountId, String serviceKey, HoldRequest request);
+
+    void debitAccount(Long accountId, String serviceKey, DebitRequest request);
+
+    void creditAccount(Long accountId, String serviceKey, CreditRequest request);
+
+    void releaseHold(Long accountId, String serviceKey, HoldRequest request);
+
+    void reverseDebit(Long accountId, String serviceKey, DebitRequest request);
+
+    void reverseCredit(Long accountId, String serviceKey, CreditRequest request);
 }

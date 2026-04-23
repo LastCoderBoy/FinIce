@@ -1,6 +1,10 @@
 package com.jk.finice.accountservice.service.impl;
 
 import com.jk.finice.accountservice.config.AccountProperties;
+import com.jk.finice.accountservice.dto.client.AccountInternalResponse;
+import com.jk.finice.accountservice.dto.client.CreditRequest;
+import com.jk.finice.accountservice.dto.client.DebitRequest;
+import com.jk.finice.accountservice.dto.client.HoldRequest;
 import com.jk.finice.accountservice.dto.request.CloseAccountRequest;
 import com.jk.finice.accountservice.dto.request.CreateAccountRequest;
 import com.jk.finice.accountservice.dto.request.UpdateAccountRequest;
@@ -15,12 +19,11 @@ import com.jk.finice.accountservice.exception.AccountClosedException;
 import com.jk.finice.accountservice.exception.AccountCreationFailedException;
 import com.jk.finice.accountservice.repository.AccountRepository;
 import com.jk.finice.accountservice.service.AccountService;
-import com.jk.finice.accountservice.util.MaskingUtils;
+import com.jk.finice.commonlibrary.utils.MaskingUtils;
 import com.jk.finice.commonlibrary.exception.*;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -28,13 +31,15 @@ import java.math.BigDecimal;
 import java.math.BigInteger;
 import java.time.LocalDateTime;
 import java.util.List;
-import java.util.Optional;
 import java.util.concurrent.ThreadLocalRandom;
 
 @Service
 @Slf4j
 @RequiredArgsConstructor
 public class AccountServiceImpl implements AccountService {
+
+    @Value("${internal.service.secret}")
+    private String serviceKey;
 
     private final AccountProperties accountProperties;
     private final AccountRepository accountRepository;
@@ -205,6 +210,76 @@ public class AccountServiceImpl implements AccountService {
 
     }
 
+    @Transactional(readOnly = true)
+    @Override
+    public AccountInternalResponse getAccountInternal(Long accountId, String inputServiceKey){
+        validateInternalServiceKey(inputServiceKey, accountId);
+
+        Account account = getAccountForInternalOperation(accountId);
+
+        return new AccountInternalResponse(account);
+    }
+
+    @Transactional
+    @Override
+    public void placeHold(Long accountId, String inputServiceKey, HoldRequest request) {
+        validateInternalServiceKey(inputServiceKey, accountId);
+        Account account = getAccountForInternalOperation(accountId);
+
+        account.placeHold(request.getAmount());
+        accountRepository.save(account);
+    }
+
+    @Transactional
+    @Override
+    public void debitAccount(Long accountId, String inputServiceKey, DebitRequest request) {
+        validateInternalServiceKey(inputServiceKey, accountId);
+        Account account = getAccountForInternalOperation(accountId);
+
+        account.captureHold(request.getAmount());
+        accountRepository.save(account);
+    }
+
+    @Transactional
+    @Override
+    public void creditAccount(Long accountId, String inputServiceKey, CreditRequest request) {
+        validateInternalServiceKey(inputServiceKey, accountId);
+        Account account = getAccountForInternalOperation(accountId);
+
+        account.credit(request.getAmount());
+        accountRepository.save(account);
+    }
+
+    @Transactional
+    @Override
+    public void releaseHold(Long accountId, String inputServiceKey, HoldRequest request) {
+        validateInternalServiceKey(inputServiceKey, accountId);
+        Account account = getAccountForInternalOperation(accountId);
+
+        account.releaseHold(request.getAmount());
+        accountRepository.save(account);
+    }
+
+    @Transactional
+    @Override
+    public void reverseDebit(Long accountId, String inputServiceKey, DebitRequest request) {
+        validateInternalServiceKey(inputServiceKey, accountId);
+        Account account = getAccountForInternalOperation(accountId);
+
+        account.credit(request.getAmount());
+        accountRepository.save(account);
+    }
+
+    @Transactional
+    @Override
+    public void reverseCredit(Long accountId, String inputServiceKey, CreditRequest request) {
+        validateInternalServiceKey(inputServiceKey, accountId);
+        Account account = getAccountForInternalOperation(accountId);
+
+        account.debit(request.getAmount());
+        accountRepository.save(account);
+    }
+
 
     // ==================== HELPER METHODS ====================
 
@@ -303,6 +378,26 @@ public class AccountServiceImpl implements AccountService {
         }
 
         return account;
+    }
+
+    private Account getAccountForInternalOperation(Long accountId) {
+        Account account = accountRepository.findById(accountId)
+                .orElseThrow(() -> {
+                    log.warn("[ACCOUNT-SERVICE] Account not found for internal request. Account ID: {}", accountId);
+                    return new ResourceNotFoundException("Account not found with ID: " + accountId);
+                });
+
+        if(account.getStatus() == AccountStatus.CLOSED ){
+            throw new AccountClosedException("This account has been permanently closed");
+        }
+        return account;
+    }
+
+    private void validateInternalServiceKey(String inputServiceKey, Long accountId) {
+        if(!serviceKey.equals(inputServiceKey)){
+            log.warn("[ACCOUNT-SERVICE] Unauthorized internal access attempt for account ID: {}", accountId);
+            throw new UnauthorizedException("Invalid service key");
+        }
     }
 
 

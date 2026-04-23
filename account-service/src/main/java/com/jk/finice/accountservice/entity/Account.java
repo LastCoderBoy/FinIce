@@ -39,7 +39,7 @@ public class Account {
     // ========== Ownership ==========
 
     @Column(name = "user_id", nullable = false)
-    private Long userId;  // References User in auth-service
+    private Long userId;  // References User in auth-service (comes from the api-gateway)
 
     // ========== Account Details ==========
 
@@ -60,11 +60,11 @@ public class Account {
 
     @Column(nullable = false, precision = 19, scale = 2)
     @Builder.Default
-    private BigDecimal balance = BigDecimal.ZERO; // the money which you see in the account
+    private BigDecimal balance = BigDecimal.ZERO; // the money which can be visible on the account
 
     @Column(name = "available_balance", nullable = false, precision = 19, scale = 2)
     @Builder.Default
-    private BigDecimal availableBalance = BigDecimal.ZERO; // the money which you can use NOW
+    private BigDecimal availableBalance = BigDecimal.ZERO; // the money which can be used NOW
 
     @Column(name = "hold_amount", nullable = false, precision = 19, scale = 2)
     @Builder.Default
@@ -121,7 +121,7 @@ public class Account {
     // ========== Helper Methods ==========
 
     /**
-     * Credit amount to account
+     * Insert amount to account
      */
     public void credit(BigDecimal amount) {
         if (amount == null || amount.compareTo(BigDecimal.ZERO) <= 0) {
@@ -133,7 +133,7 @@ public class Account {
     }
 
     /**
-     * Debit amount from account
+     * Deduct amount from account
      */
     public void debit(BigDecimal amount) {
         if (amount == null || amount.compareTo(BigDecimal.ZERO) <= 0) {
@@ -173,6 +173,25 @@ public class Account {
         }
         this.holdAmount = this.holdAmount.subtract(amount);
         this.availableBalance = this.availableBalance.add(amount);
+    }
+
+    /**
+     * Finalize held funds by moving amount out of balance without touching available balance.
+     * placeHold() already reduced available balance, so we only reduce hold and total balance here.
+     */
+    public void captureHold(BigDecimal amount) {
+        if (amount == null || amount.compareTo(BigDecimal.ZERO) <= 0) {
+            throw new IllegalArgumentException("Capture amount must be positive");
+        }
+        if (this.holdAmount.compareTo(amount) < 0) {
+            throw new IllegalArgumentException("Insufficient held funds");
+        }
+        if (this.balance.compareTo(amount) < 0) {
+            throw new IllegalArgumentException("Insufficient balance");
+        }
+        this.holdAmount = this.holdAmount.subtract(amount);
+        this.balance = this.balance.subtract(amount);
+        this.lastTransactionAt = LocalDateTime.now();
     }
 
     public void close(String reason) {
