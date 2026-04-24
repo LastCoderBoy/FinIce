@@ -1,8 +1,7 @@
 package com.jk.finice.transactionservice.service.persistence;
 
-package com.jk.finice.accountservice.service.impl;
-
 import com.jk.finice.commonlibrary.exception.ValidationException;
+import com.jk.finice.transactionservice.dto.response.PersistResult;
 import com.jk.finice.transactionservice.entity.Transaction;
 import com.jk.finice.transactionservice.repository.TransactionRepository;
 import lombok.RequiredArgsConstructor;
@@ -35,13 +34,15 @@ public class TransactionPersistenceService {
     }
 
     @Transactional
-    public Transaction persistPending(Transaction transaction, String resolvedKey) {
+    public PersistResult persistPending(Transaction transaction, String resolvedKey) {
         try {
-            return transactionRepository.save(transaction);
+            Transaction saved = transactionRepository.save(transaction);
+            return new PersistResult(saved, true);   // <- winner
         } catch (DataIntegrityViolationException e) {
-            log.info("[PERSISTENCE] Duplicate idempotency key during save: {}", resolvedKey);
-            return transactionRepository.findByIdempotencyKey(resolvedKey)
+            log.info("[PERSISTENCE] Duplicate idempotency key: {}", resolvedKey);
+            Transaction existing = transactionRepository.findByIdempotencyKey(resolvedKey)
                     .orElseThrow(() -> new ValidationException("Duplicate idempotency key"));
+            return new PersistResult(existing, false); // <- loser
         }
     }
 

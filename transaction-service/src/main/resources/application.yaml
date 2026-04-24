@@ -5,6 +5,10 @@ spring:
   application:
     name: transaction-service
 
+  threads:
+    virtual:
+      enabled: true
+
   # ========================================
   # DATABASE CONFIGURATION
   # ========================================
@@ -46,9 +50,6 @@ server:
 internal:
   service:
     secret: ${INTERNAL_SERVICE_SECRET_KEY}
-transaction:
-  idempotency:
-    expiration-hours: 24          # How long to keep idempotency records
 
 # ========================================
 # EUREKA CLIENT CONFIGURATION
