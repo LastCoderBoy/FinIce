@@ -105,11 +105,12 @@ public class TransactionServiceImpl implements TransactionService {
         }
 
         // Validate sender and receiver accounts
-        validateSenderAccount(
-                senderClient, transferRequest, userId,
-                persistenceService.getDailyTransferredAmount(
-                        senderClient.getIban(), senderClient.getAccountId())
+
+        BigDecimal dailyUsed = persistenceService.getDailyTransferredAmount(
+                senderClient.getIban(), senderClient.getAccountId()
         );
+
+        validateSenderAccount(senderClient, transferRequest, userId, dailyUsed);
         validateReceiverAccount(receiverClient, senderClient.getCurrency());
 
 
