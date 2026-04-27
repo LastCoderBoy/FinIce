@@ -14,7 +14,7 @@ import org.springframework.context.annotation.Configuration;
 import static com.jk.finice.commonlibrary.constants.AppConstants.SERVICE_KEY_HEADER;
 
 @Configuration
-@EnableFeignClients(basePackages = "com.jk.finice.transactionservice.service.client")
+@EnableFeignClients(basePackages = "com.jk.finice.transactionservice.client")
 public class FeignConfig {
 
     @Value("${internal.service.secret}")

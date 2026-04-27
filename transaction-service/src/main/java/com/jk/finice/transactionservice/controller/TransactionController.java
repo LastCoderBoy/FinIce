@@ -41,11 +41,13 @@ public class TransactionController {
     }
 
     @PostMapping("/external")
-    public ResponseEntity<ApiResponse<TransferResponse>> externalTransfer(@Valid @RequestBody ExternalTransferRequest transferRequest,
-                                                                          @RequestHeader(USER_ID_HEADER) Long userId){
+    public ResponseEntity<ApiResponse<TransferResponse>> externalTransfer(
+            @Valid @RequestBody ExternalTransferRequest transferRequest,
+            @RequestHeader(USER_ID_HEADER) Long userId,
+            @RequestHeader(name = IDEMPOTENCY_HEADER, required = false) String idempotencyKey){
         log.info("[TRANSACTION-CONTROLLER] External transfer initiated for user ID: {}", userId);
 
-        TransferResponse response = transactionService.externalTransfer(transferRequest, userId);
+        TransferResponse response = transactionService.externalTransfer(transferRequest, userId, idempotencyKey);
 
         return ResponseEntity
                 .status(HttpStatus.CREATED).body(

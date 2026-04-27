@@ -1,8 +1,12 @@
 package com.jk.finice.transactionservice.entity;
 
 import com.jk.finice.commonlibrary.enums.Currency;
+import com.jk.finice.transactionservice.dto.client.AccountClientResponse;
+import com.jk.finice.transactionservice.dto.request.ExternalTransferRequest;
+import com.jk.finice.transactionservice.dto.request.InternalTransferRequest;
 import com.jk.finice.transactionservice.enums.TransactionStatus;
 import com.jk.finice.transactionservice.enums.TransactionType;
+import com.jk.finice.transactionservice.enums.TransferScope;
 import jakarta.persistence.*;
 import lombok.*;
 import org.hibernate.annotations.CreationTimestamp;
@@ -41,7 +45,6 @@ public class Transaction {
 
     /**
      * Public-facing transaction ID (UUID format)
-     * Example: "TXN-550e8400-e29b-41d4-a716-446655440000"
      */
     @Column(name = "transaction_id", unique = true, nullable = false, length = 50)
     private String transactionId;
@@ -52,6 +55,8 @@ public class Transaction {
     @Column(name = "idempotency_key", length = 100, unique = true)
     private String idempotencyKey;
 
+    // Future enhancement: add requestHash for the Idempotency Validation
+
     /**
      * Bank reference number (for customer support)
      * Example: "REF-20250207-001234"
@@ -59,6 +64,8 @@ public class Transaction {
     @Column(name = "reference", length = 50, unique = true)
     private String reference;
 
+    @Column(name = "network_reference", length = 100)
+    private String networkReference;  // SWIFT/SEPA reference from external network
 
     @Enumerated(EnumType.STRING)
     @Column( name = "transaction_type", nullable = false, length = 20)
@@ -79,6 +86,12 @@ public class Transaction {
     @Column(name = "receiver_iban", length = 34)
     private String receiverIban;  // nullable for DEPOSIT (no sender outside system)
 
+    @Column(name = "receiver_name", length = 100)
+    private String receiverName;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "transfer_scope", length = 10)
+    private TransferScope transferScope;
 
     // ============ Money Details ============
     @Column(name = "amount", precision = 19, scale = 2, nullable = false)
@@ -120,6 +133,59 @@ public class Transaction {
     // ============================================
     // Helper Methods
     // ============================================
+
+    public static Transaction buildPendingInternalTransaction(InternalTransferRequest request,
+                                                              String resolvedKey,
+                                                              String transactionId,
+                                                              String reference,
+                                                              AccountClientResponse sender,
+                                                              AccountClientResponse receiver,
+                                                              Long userId) {
+        return Transaction.builder()
+                .transactionId(transactionId)
+                .reference(reference)
+                .idempotencyKey(resolvedKey)
+                .transactionType(TransactionType.TRANSFER)
+                .status(TransactionStatus.PENDING)
+                .sourceAccountId(request.getSourceAccountId())
+                .destinationAccountId(request.getDestinationAccountId())
+                .senderIban(sender.getIban())
+                .receiverIban(receiver.getIban())
+                .receiverName(null)
+                .transferScope(TransferScope.INTERNAL)
+                .amount(request.getAmount())
+                .currency(sender.getCurrency())
+                .description(request.getDescription())
+                .createdBy(userId)
+                .build();
+    }
+
+    public static Transaction buildPendingExternalTransaction(ExternalTransferRequest request,
+                                                        String resolvedKey,
+                                                        String transactionId,
+                                                        String reference,
+                                                        AccountClientResponse sender,
+                                                        String receiverIban,
+                                                        Long userId) {
+        return Transaction.builder()
+                .transactionId(transactionId)
+                .reference(reference)
+                .idempotencyKey(resolvedKey)
+                .transactionType(TransactionType.TRANSFER)
+                .status(TransactionStatus.PENDING)
+                .sourceAccountId(request.getSourceAccountId())
+                .destinationAccountId(null)
+                .senderIban(sender.getIban())
+                .receiverIban(receiverIban)
+                .receiverName(request.getReceiverName())
+                .transferScope(TransferScope.EXTERNAL)
+                .amount(request.getAmount())
+                .currency(sender.getCurrency())
+                .description(request.getDescription())
+                .createdBy(userId)
+                .build();
+    }
+
 
     public void markCompleted() {
         this.status = TransactionStatus.COMPLETE;

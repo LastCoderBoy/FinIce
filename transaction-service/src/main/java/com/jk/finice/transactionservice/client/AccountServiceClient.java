@@ -1,4 +1,4 @@
-package com.jk.finice.transactionservice.service.client;
+package com.jk.finice.transactionservice.client;
 
 
 import com.jk.finice.transactionservice.dto.client.AccountClientResponse;

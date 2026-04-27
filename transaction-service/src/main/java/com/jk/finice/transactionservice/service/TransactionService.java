@@ -7,5 +7,5 @@ import com.jk.finice.transactionservice.dto.response.TransferResponse;
 public interface TransactionService {
     TransferResponse internalTransfer(InternalTransferRequest transferRequest, Long userId, String idempotencyKey);
 
-    TransferResponse externalTransfer(ExternalTransferRequest transferRequest, Long userId);
+    TransferResponse externalTransfer(ExternalTransferRequest transferRequest, Long userId, String idempotencyKey);
 }

@@ -4,22 +4,23 @@ import com.jk.finice.commonlibrary.enums.Currency;
 import com.jk.finice.commonlibrary.exception.ResourceNotFoundException;
 import com.jk.finice.commonlibrary.exception.UnauthorizedException;
 import com.jk.finice.commonlibrary.exception.ValidationException;
+import com.jk.finice.commonlibrary.utils.MaskingUtils;
+import com.jk.finice.transactionservice.client.AccountServiceClient;
 import com.jk.finice.transactionservice.dto.client.AccountClientResponse;
 import com.jk.finice.transactionservice.dto.client.CreditRequest;
 import com.jk.finice.transactionservice.dto.client.DebitRequest;
 import com.jk.finice.transactionservice.dto.client.HoldRequest;
 import com.jk.finice.transactionservice.dto.request.ExternalTransferRequest;
 import com.jk.finice.transactionservice.dto.request.InternalTransferRequest;
+import com.jk.finice.transactionservice.dto.response.IbanValidationResult;
 import com.jk.finice.transactionservice.dto.response.PersistResult;
 import com.jk.finice.transactionservice.dto.response.TransferResponse;
 import com.jk.finice.transactionservice.entity.Transaction;
-import com.jk.finice.transactionservice.enums.TransactionStatus;
-import com.jk.finice.transactionservice.enums.TransactionType;
 import com.jk.finice.transactionservice.exception.TransactionFailedException;
+import com.jk.finice.transactionservice.externalGateway.ExternalPaymentGateway;
 import com.jk.finice.transactionservice.mapper.TransactionMapper;
-import com.jk.finice.transactionservice.repository.TransactionRepository;
 import com.jk.finice.transactionservice.service.TransactionService;
-import com.jk.finice.transactionservice.service.client.AccountServiceClient;
+import com.jk.finice.transactionservice.service.component.IbanValidator;
 import com.jk.finice.transactionservice.service.persistence.TransactionPersistenceService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -43,9 +44,10 @@ import static com.jk.finice.commonlibrary.utils.TokenUtils.generateSecureToken;
 public class TransactionServiceImpl implements TransactionService {
 
     private final ExecutorService virtualThreadExecutor;
+    private final IbanValidator ibanValidator;
     private final AccountServiceClient accountServiceClient;
     private final TransactionPersistenceService persistenceService;
-    private final TransactionRepository transactionRepository;
+    private final ExternalPaymentGateway externalPaymentGateway;
 
 
     @Override
@@ -110,7 +112,7 @@ public class TransactionServiceImpl implements TransactionService {
                 senderClient.getIban(), senderClient.getAccountId()
         );
 
-        validateSenderAccount(senderClient, transferRequest, userId, dailyUsed);
+        validateSenderAccount(senderClient, transferRequest.getSourceAccountId(), transferRequest.getAmount(), userId, dailyUsed);
         validateReceiverAccount(receiverClient, senderClient.getCurrency());
 
 
@@ -118,10 +120,11 @@ public class TransactionServiceImpl implements TransactionService {
         String reference = generateReference();
 
         // Persist PENDING transaction
-        Transaction transaction = buildPendingTransaction(
+        Transaction transaction = Transaction.buildPendingInternalTransaction(
                 transferRequest, resolvedKey, transactionId,
                 reference, senderClient, receiverClient, userId
         );
+
 
         PersistResult persistResult = persistenceService.persistPending(transaction, resolvedKey);
 
@@ -134,8 +137,6 @@ public class TransactionServiceImpl implements TransactionService {
 
         // Only winner Thread continues from here
         Transaction savedTransaction = persistResult.getTransaction();
-
-
 
         boolean holdPlaced = false;
         boolean debitExecuted = false;
@@ -167,7 +168,7 @@ public class TransactionServiceImpl implements TransactionService {
             log.error("[TRANSACTION-SERVICE] Transfer failed for transaction ID: {}", transactionId, e);
             handleCompensation(
                     holdPlaced, debitExecuted, creditExecuted, senderClient,
-                    receiverClient, transferRequest, transactionId
+                    receiverClient, transferRequest.getAmount(), transactionId
             );
 
             persistenceService.markFailed(savedTransaction, e.getMessage());
@@ -184,38 +185,119 @@ public class TransactionServiceImpl implements TransactionService {
     }
 
     @Override
-    public TransferResponse externalTransfer(ExternalTransferRequest transferRequest, Long userId) {
-        return null;
+    public TransferResponse externalTransfer(ExternalTransferRequest transferRequest, Long userId, String idempotencyKey) {
+
+        // Validate receiver IBAN format first before any external calls
+        String normalizedReceiverIban = normalizeIban(transferRequest.getReceiverIban());
+        IbanValidationResult ibanResult = ibanValidator.validate(normalizedReceiverIban);
+        if (!ibanResult.valid()) {
+            throw new ValidationException("Invalid receiver IBAN: " + ibanResult.errorMessage());
+        }
+
+        // Idempotency check first to fail fast on duplicates before any external calls
+        String resolvedKey = resolveKey(idempotencyKey);
+        Optional<Transaction> existing = persistenceService.checkIdempotency(resolvedKey);
+        if (existing.isPresent()) {
+            Transaction existingTxn = existing.get();
+            log.info("[TRANSACTION-SERVICE] Duplicate external transfer request detected, returning existing transaction: {}",
+                    existingTxn.getTransactionId());
+            return TransactionMapper.toTransferResponse(existingTxn);
+        }
+
+        // Validate sender account
+        AccountClientResponse senderClient = accountServiceClient.getAccountInternal(transferRequest.getSourceAccountId());
+        BigDecimal dailyUsed = persistenceService.getDailyTransferredAmount(
+                senderClient.getIban(), senderClient.getAccountId()
+        );
+        validateSenderAccount(
+                senderClient, transferRequest.getSourceAccountId(),
+                transferRequest.getAmount(), userId, dailyUsed
+        );
+
+        // Once we get the sender account, validate the IBAN against the receiver IBAN.
+        String normalizedSenderIban = normalizeIban(senderClient.getIban());
+        if (normalizedSenderIban.equals(normalizedReceiverIban)) {
+            throw new ValidationException("Cannot transfer to the same IBAN");
+        }
+
+        try {
+            accountServiceClient.getAccountInternalByIban(normalizedReceiverIban);
+            // If we reach here - account exists in FinIce
+            throw new ValidationException(
+                    "Receiver account belongs to FinIce. Please use internal transfer."
+            );
+        } catch (ResourceNotFoundException e) {
+            // Account not in FinIce - continue as external
+            log.debug("[TRANSACTION-SERVICE] Receiver IBAN is external, proceeding: {}",
+                    MaskingUtils.maskIban(normalizedReceiverIban));
+        }
+
+        String transactionId = generateTransactionId();
+        String reference = generateReference();
+        Transaction transaction = Transaction.buildPendingExternalTransaction(
+                transferRequest, resolvedKey, transactionId, reference,
+                senderClient, normalizedReceiverIban, userId
+        );
+
+        PersistResult persistResult = persistenceService.persistPending(transaction, resolvedKey);
+        if (!persistResult.isOwner()) {
+            log.info("[TRANSACTION-SERVICE] Concurrent duplicate external transfer detected, returning existing: {}",
+                    persistResult.getTransaction().getTransactionId());
+            return TransactionMapper.toTransferResponse(persistResult.getTransaction());
+        }
+        Transaction savedTransaction = persistResult.getTransaction();
+
+        boolean holdPlaced = false;
+        boolean debitExecuted = false;
+
+        try {
+            accountServiceClient.placeHold(
+                    senderClient.getAccountId(),
+                    new HoldRequest(transferRequest.getAmount(), transactionId)
+            );
+            holdPlaced = true;
+
+            accountServiceClient.debitAccount(
+                    senderClient.getAccountId(),
+                    new DebitRequest(transferRequest.getAmount(), transactionId)
+            );
+            debitExecuted = true;
+
+            ExternalPaymentGateway.ExternalPaymentResult networkResult = externalPaymentGateway.sendPayment(
+                    ExternalPaymentGateway.ExternalPaymentRequest.builder()
+                            .receiverIban(normalizedReceiverIban)
+                            .build()
+            );
+            if (!networkResult.isSuccess()) {
+                throw new TransactionFailedException("External payment failed: " + networkResult.getMessage());
+            }
+
+            savedTransaction.setNetworkReference(networkResult.getNetworkReference());
+            persistenceService.markComplete(savedTransaction);
+        } catch (Exception e) {
+            log.error("[TRANSACTION-SERVICE] External transfer failed for transaction ID: {}", transactionId, e);
+            handleCompensation(
+                    holdPlaced, debitExecuted, false, senderClient,
+                    null, transferRequest.getAmount(), transactionId
+            );
+            persistenceService.markFailed(savedTransaction, e.getMessage());
+
+            if (e instanceof ValidationException ||
+                    e instanceof UnauthorizedException ||
+                    e instanceof ResourceNotFoundException ||
+                    e instanceof TransactionFailedException){
+                throw e;
+            }
+            throw new TransactionFailedException("External transfer failed: " + e.getMessage(), e);
+        }
+
+        return TransactionMapper.toTransferResponse(savedTransaction);
     }
 
 
     // =====================================================
     //                     HELPER METHODS
     // =====================================================
-
-    private Transaction buildPendingTransaction(InternalTransferRequest request,
-                                                String resolvedKey,
-                                                String transactionId,
-                                                String reference,
-                                                AccountClientResponse sender,
-                                                AccountClientResponse receiver,
-                                                Long userId) {
-        return Transaction.builder()
-                .transactionId(transactionId)
-                .reference(reference)
-                .idempotencyKey(resolvedKey)
-                .transactionType(TransactionType.TRANSFER)
-                .status(TransactionStatus.PENDING)
-                .sourceAccountId(request.getSourceAccountId())
-                .destinationAccountId(request.getDestinationAccountId())
-                .senderIban(sender.getIban())
-                .receiverIban(receiver.getIban())
-                .amount(request.getAmount())
-                .currency(sender.getCurrency())
-                .description(request.getDescription())
-                .createdBy(userId)
-                .build();
-    }
 
     private String generateTransactionId() {
         // System identifier: longer, more entropy, not customer facing
@@ -239,26 +321,30 @@ public class TransactionServiceImpl implements TransactionService {
                 : UUID.randomUUID().toString();
     }
 
+    private String normalizeIban(String iban) {
+        return iban == null ? "" : iban.trim().replace(" ", "").toUpperCase();
+    }
+
     private void handleCompensation(boolean holdPlaced, boolean debitExecuted,
                                     boolean creditExecuted,
                                     AccountClientResponse sender,
                                     AccountClientResponse receiver,
-                                    InternalTransferRequest request,
+                                    BigDecimal amount,
                                     String transactionId) {
         try {
             if (holdPlaced && !debitExecuted) {
                 accountServiceClient.releaseHold(sender.getAccountId(),
-                        new HoldRequest(request.getAmount(), transactionId));
+                        new HoldRequest(amount, transactionId));
 
             } else if (debitExecuted && !creditExecuted) {
                 accountServiceClient.reverseDebit(sender.getAccountId(),
-                        new DebitRequest(request.getAmount(), transactionId));
+                        new DebitRequest(amount, transactionId));
 
             } else if (debitExecuted && creditExecuted) {
                 accountServiceClient.reverseCredit(receiver.getAccountId(),
-                        new CreditRequest(request.getAmount(), transactionId));
+                        new CreditRequest(amount, transactionId));
                 accountServiceClient.reverseDebit(sender.getAccountId(),
-                        new DebitRequest(request.getAmount(), transactionId));
+                        new DebitRequest(amount, transactionId));
             }
         } catch (Exception ex) {
             log.error("[TRANSACTION-SERVICE] CRITICAL: Compensation failed for: {}",
@@ -266,29 +352,29 @@ public class TransactionServiceImpl implements TransactionService {
         }
     }
 
-    private void validateSenderAccount(AccountClientResponse senderClient, InternalTransferRequest request,
+    private void validateSenderAccount(AccountClientResponse senderClient, Long sourceAccountId, BigDecimal amount,
                                        Long userId, BigDecimal dailyTransferredAmountSoFar) {
 
         // Validate sender Account
         if(!Objects.equals(senderClient.getUserId(), userId)){
             log.error("[TRANSACTION-SERVICE] Unauthorized access attempt to transfer funds from account ID: {} by user ID: {}]",
-                    request.getSourceAccountId(), userId);
+                    sourceAccountId, userId);
             throw new UnauthorizedException("Unauthorized access attempt");
         }
         if(senderClient.getStatus() == AccountClientResponse.AccountStatus.CLOSED){
-            log.error("[TRANSACTION-SERVICE] Account ID: {} is closed", request.getSourceAccountId());
+            log.error("[TRANSACTION-SERVICE] Account ID: {} is closed", sourceAccountId);
             throw new ValidationException("Your account is closed. Please contact support for assistance");
         }
-        if(request.getAmount()
+        if(amount
                 .compareTo(senderClient.getAvailableBalance()) > 0){
             log.error("[TRANSACTION-SERVICE] Insufficient funds in source account ID: {}",
-                    request.getSourceAccountId());
+                    sourceAccountId);
             throw new ValidationException("Insufficient funds in source account");
         }
 
         // checks if adding THIS transfer would exceed limit
         if(dailyTransferredAmountSoFar
-                .add(request.getAmount())
+                .add(amount)
                 .compareTo(senderClient.getDailyTransferLimit()) > 0){
             log.error("[TRANSACTION-SERVICE] Daily transfer limit exceeded for account ID: {}. Amount transferred today: {}, Daily limit: {}",
                     senderClient.getAccountId(), dailyTransferredAmountSoFar, senderClient.getDailyTransferLimit());
