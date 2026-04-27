@@ -220,6 +220,14 @@ public class AccountServiceImpl implements AccountService {
         return new AccountInternalResponse(account);
     }
 
+    @Transactional(readOnly = true)
+    @Override
+    public AccountInternalResponse getAccountInternalByIban(String iban, String inputServiceKey) {
+        validateInternalServiceKey(inputServiceKey, null);
+        Account account = getAccountForInternalOperationByIban(iban);
+        return new AccountInternalResponse(account);
+    }
+
     @Transactional
     @Override
     public void placeHold(Long accountId, String inputServiceKey, HoldRequest request) {
@@ -385,6 +393,19 @@ public class AccountServiceImpl implements AccountService {
                 .orElseThrow(() -> {
                     log.warn("[ACCOUNT-SERVICE] Account not found for internal request. Account ID: {}", accountId);
                     return new ResourceNotFoundException("Account not found with ID: " + accountId);
+                });
+
+        if(account.getStatus() == AccountStatus.CLOSED ){
+            throw new AccountClosedException("This account has been permanently closed");
+        }
+        return account;
+    }
+
+    private Account getAccountForInternalOperationByIban(String iban) {
+        Account account = accountRepository.findByIban(iban)
+                .orElseThrow(() -> {
+                    log.warn("[ACCOUNT-SERVICE] Account not found for internal request. IBAN: {}", MaskingUtils.maskIban(iban));
+                    return new ResourceNotFoundException("Account not found with IBAN: " + iban);
                 });
 
         if(account.getStatus() == AccountStatus.CLOSED ){

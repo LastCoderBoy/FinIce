@@ -145,6 +145,17 @@ public class AccountController {
         return ResponseEntity.ok(accountResponse);
     }
 
+    @GetMapping("/internal/by-iban")
+    public ResponseEntity<AccountInternalResponse> getAccountInternalByIban(
+            @RequestParam String iban,
+            @RequestHeader(SERVICE_KEY_HEADER) String serviceKey) {
+        log.info("[ACCOUNT-CONTROLLER] Internal Service call for IBAN: {}", iban);
+
+        AccountInternalResponse accountResponse = accountService.getAccountInternalByIban(iban, serviceKey);
+
+        return ResponseEntity.ok(accountResponse);
+    }
+
     @PutMapping("/internal/{accountId}/hold")
     public void placeHold(@PathVariable Long accountId,
                           @RequestHeader(SERVICE_KEY_HEADER) String serviceKey,

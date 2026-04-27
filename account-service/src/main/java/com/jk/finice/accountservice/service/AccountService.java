@@ -32,6 +32,8 @@ public interface AccountService {
 
     AccountInternalResponse getAccountInternal(Long accountId, String serviceKey);
 
+    AccountInternalResponse getAccountInternalByIban(String iban, String serviceKey);
+
     void placeHold(Long accountId, String serviceKey, HoldRequest request);
 
     void debitAccount(Long accountId, String serviceKey, DebitRequest request);
