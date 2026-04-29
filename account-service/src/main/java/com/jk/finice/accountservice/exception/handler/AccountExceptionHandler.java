@@ -1,6 +1,5 @@
 package com.jk.finice.accountservice.exception.handler;
 
-import com.jk.finice.accountservice.exception.AccountClosedException;
 import com.jk.finice.accountservice.exception.AccountCreationFailedException;
 import com.jk.finice.commonlibrary.dto.ApiResponse;
 import com.jk.finice.commonlibrary.exception.*;
@@ -64,7 +63,7 @@ public class AccountExceptionHandler {
         log.error("[ACCOUNT-EXCEPTION-HANDLER] Account closed: {}", ex.getMessage());
 
         return ResponseEntity
-                .status(HttpStatus.BAD_REQUEST)
+                .status(HttpStatus.CONFLICT)
                 .body(ApiResponse.error(ex.getMessage()));
     }
 

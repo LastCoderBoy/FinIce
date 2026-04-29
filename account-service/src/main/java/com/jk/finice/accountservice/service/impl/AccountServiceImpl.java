@@ -15,7 +15,6 @@ import com.jk.finice.accountservice.dto.response.BalanceResponse;
 import com.jk.finice.accountservice.entity.Account;
 import com.jk.finice.accountservice.enums.AccountStatus;
 import com.jk.finice.accountservice.enums.AccountType;
-import com.jk.finice.accountservice.exception.AccountClosedException;
 import com.jk.finice.accountservice.exception.AccountCreationFailedException;
 import com.jk.finice.accountservice.repository.AccountRepository;
 import com.jk.finice.accountservice.service.AccountService;
@@ -396,7 +395,7 @@ public class AccountServiceImpl implements AccountService {
                 });
 
         if(account.getStatus() == AccountStatus.CLOSED ){
-            throw new AccountClosedException("This account has been permanently closed");
+            throw new AccountClosedException("The account with ID: " + account + " has been permanently closed");
         }
         return account;
     }
