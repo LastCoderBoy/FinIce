@@ -25,7 +25,8 @@ import java.time.LocalDateTime;
             @Index(name = "idx_status", columnList = "status"),
             @Index(name = "idx_transaction_type", columnList = "transaction_type"),
             @Index(name = "idx_created_at", columnList = "created_at"),
-            @Index(name = "idx_idempotency_key", columnList = "idempotency_key")
+            @Index(name = "idx_idempotency_key", columnList = "idempotency_key"),
+            @Index(name = "idx_created_by", columnList = "created_by")
         },
         uniqueConstraints = {
             @UniqueConstraint(name = "uk_transaction_id", columnNames = "transaction_id"),
@@ -45,6 +46,8 @@ public class Transaction {
 
     /**
      * Public-facing transaction ID (UUID format)
+     * Format: <prefix>-<YYYYMMDD>-<random-string>
+     * Example: TXN-20250422-A3F8C2E1D4B7
      */
     @Column(name = "transaction_id", unique = true, nullable = false, length = 50)
     private String transactionId;

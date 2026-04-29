@@ -1,22 +1,44 @@
 package com.jk.finice.transactionservice.exception.handler;
 
 import com.jk.finice.commonlibrary.dto.ApiResponse;
-import com.jk.finice.commonlibrary.exception.InternalServerException;
-import com.jk.finice.commonlibrary.exception.ResourceNotFoundException;
-import com.jk.finice.commonlibrary.exception.UnauthorizedException;
-import com.jk.finice.commonlibrary.exception.ValidationException;
+import com.jk.finice.commonlibrary.exception.*;
 import com.jk.finice.transactionservice.exception.AccountClientException;
 import com.jk.finice.transactionservice.exception.TransactionFailedException;
 import jakarta.ws.rs.ForbiddenException;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.validation.FieldError;
+import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+
+import java.util.HashMap;
+import java.util.Map;
 
 @RestControllerAdvice
 @Slf4j
 public class TransactionExceptionHandler {
+
+    /**
+     * Handle validation errors (from @Valid)
+     */
+    @ExceptionHandler(MethodArgumentNotValidException.class)
+    public ResponseEntity<ApiResponse<Map<String, String>>> handleValidationExceptions(MethodArgumentNotValidException ex) {
+
+        Map<String, String> errors = new HashMap<>();
+        ex.getBindingResult().getAllErrors().forEach((error) -> {
+            String fieldName = ((FieldError) error).getField();
+            String errorMessage = error.getDefaultMessage();
+            errors.put(fieldName, errorMessage);
+        });
+
+        log.error("[TRANSACTION-EXCEPTION-HANDLER] Validation error: {}", errors);
+
+        return ResponseEntity
+                .status(HttpStatus.BAD_REQUEST)
+                .body(ApiResponse.error("Validation failed", errors));
+    }
 
     @ExceptionHandler(AccountClientException.class)
     public ResponseEntity<ApiResponse<Void>> handleAccountClientException(AccountClientException ex) {
@@ -48,6 +70,15 @@ public class TransactionExceptionHandler {
                 .body(ApiResponse.error(ex.getMessage()));
     }
 
+    @ExceptionHandler(AccountClosedException.class)
+    public ResponseEntity<ApiResponse<Void>> handleAccountClosedException(AccountClosedException ex){
+        log.error("[TRANSACTION-EXCEPTION-HANDLER] Account closed: {}", ex.getMessage());
+
+        return ResponseEntity
+                .status(HttpStatus.CONFLICT)
+                .body(ApiResponse.error(ex.getMessage()));
+    }
+
     @ExceptionHandler(UnauthorizedException.class)
     public ResponseEntity<ApiResponse<Void>> handleUnauthorizedException(UnauthorizedException ex) {
         log.error("[TRANSACTION-EXCEPTION-HANDLER] Unauthorized exception: {}", ex.getMessage());
@@ -74,5 +105,18 @@ public class TransactionExceptionHandler {
         return ResponseEntity
                 .status(HttpStatus.INTERNAL_SERVER_ERROR)
                 .body(ApiResponse.error("An error occurred while processing your request"));
+    }
+
+
+    /**
+     * Handle all other exceptions
+     */
+    @ExceptionHandler(Exception.class)
+    public ResponseEntity<ApiResponse<Void>> handleGeneric(Exception ex) {
+        log.error("[TRANSACTION-EXCEPTION-HANDLER] Unexpected error: {}", ex.getMessage(), ex);
+
+        return ResponseEntity
+                .status(HttpStatus.INTERNAL_SERVER_ERROR)
+                .body(ApiResponse.error("An unexpected error occurred"));
     }
 }

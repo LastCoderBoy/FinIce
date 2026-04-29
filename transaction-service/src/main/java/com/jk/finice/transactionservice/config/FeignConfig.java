@@ -1,9 +1,6 @@
 package com.jk.finice.transactionservice.config;
 
-import com.jk.finice.commonlibrary.exception.InternalServerException;
-import com.jk.finice.commonlibrary.exception.ResourceNotFoundException;
-import com.jk.finice.commonlibrary.exception.UnauthorizedException;
-import com.jk.finice.commonlibrary.exception.ValidationException;
+import com.jk.finice.commonlibrary.exception.*;
 import feign.RequestInterceptor;
 import feign.codec.ErrorDecoder;
 import org.springframework.beans.factory.annotation.Value;
@@ -30,14 +27,16 @@ public class FeignConfig {
     @Bean
     public ErrorDecoder errorDecoder() {
         return (methodKey, response) -> switch (response.status()) {
-            case 404 -> new ResourceNotFoundException(
-                    "Account not found");
+            case 400 -> new ValidationException(
+                    "Invalid request!");
             case 401 -> new UnauthorizedException(
                     "Invalid service key");
-            case 400 -> new ValidationException(
-                    "Bad request to account-service");
+            case 404 -> new ResourceNotFoundException(
+                    "Account not found");
+            case 409 -> new AccountClosedException(
+                    "Account is closed and cannot be used for transactions");
             default  -> new InternalServerException(
-                    "account-service error: " + response.status());
+                    "Application Error: " + response.status());
         };
     }
 }

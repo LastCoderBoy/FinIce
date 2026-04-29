@@ -1,6 +1,8 @@
 package com.jk.finice.transactionservice.service.impl;
 
+import com.jk.finice.commonlibrary.dto.PaginatedResponse;
 import com.jk.finice.commonlibrary.enums.Currency;
+import com.jk.finice.commonlibrary.exception.AccountClosedException;
 import com.jk.finice.commonlibrary.exception.ResourceNotFoundException;
 import com.jk.finice.commonlibrary.exception.UnauthorizedException;
 import com.jk.finice.commonlibrary.exception.ValidationException;
@@ -12,19 +14,27 @@ import com.jk.finice.transactionservice.dto.client.DebitRequest;
 import com.jk.finice.transactionservice.dto.client.HoldRequest;
 import com.jk.finice.transactionservice.dto.request.ExternalTransferRequest;
 import com.jk.finice.transactionservice.dto.request.InternalTransferRequest;
-import com.jk.finice.transactionservice.dto.response.IbanValidationResult;
-import com.jk.finice.transactionservice.dto.response.PersistResult;
-import com.jk.finice.transactionservice.dto.response.TransferResponse;
+import com.jk.finice.transactionservice.dto.request.TransactionHistoryFilterRequest;
+import com.jk.finice.transactionservice.dto.response.*;
 import com.jk.finice.transactionservice.entity.Transaction;
 import com.jk.finice.transactionservice.exception.TransactionFailedException;
 import com.jk.finice.transactionservice.externalGateway.ExternalPaymentGateway;
+import com.jk.finice.transactionservice.mapper.PaginationMapper;
 import com.jk.finice.transactionservice.mapper.TransactionMapper;
+import com.jk.finice.transactionservice.repository.TransactionRepository;
 import com.jk.finice.transactionservice.service.TransactionService;
 import com.jk.finice.transactionservice.service.component.IbanValidator;
 import com.jk.finice.transactionservice.service.persistence.TransactionPersistenceService;
+import com.jk.finice.transactionservice.specification.TransactionSpecification;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
+import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
@@ -48,6 +58,45 @@ public class TransactionServiceImpl implements TransactionService {
     private final AccountServiceClient accountServiceClient;
     private final TransactionPersistenceService persistenceService;
     private final ExternalPaymentGateway externalPaymentGateway;
+    private final TransactionRepository transactionRepository;
+
+    @Transactional(readOnly = true)
+    @Override
+    public PaginatedResponse<TransactionHistoryResponse> getTransactionHistory(TransactionHistoryFilterRequest filterRequest, Long userId){
+        int page = filterRequest.getPage();
+        int size = filterRequest.getSize();
+        String sortDirection = filterRequest.getSortDirection();
+        String sortBy = filterRequest.getSortBy();
+
+        // Setup the filter and pagination
+        Sort sort = sortDirection.equalsIgnoreCase("asc") ? Sort.by(sortBy).ascending() : Sort.by(sortBy).descending();
+        Pageable pageable = PageRequest.of(page, size, sort);
+        Specification<Transaction> spec = TransactionSpecification
+                .buildFilter(userId, filterRequest);
+
+        // Fetch the transactions
+        Page<Transaction> pagedTransactions = transactionRepository.findAll(spec, pageable);
+
+        // Map to DTO and return paginated response
+        Page<TransactionHistoryResponse> dtoResponse = pagedTransactions.map(TransactionMapper::toHistoryResponse);
+        return PaginationMapper.fromPage(dtoResponse);
+    }
+
+    @Transactional(readOnly = true)
+    @Override
+    public TransactionHistoryItemResponse getDetailedHistoryResponse(String transactionId, Long userId){
+        // Check the transactionID is in valid format.
+        // "TXN-" + date + "-" + 12 random;
+        validateTransactionId(transactionId); // throws exception if invalid
+
+        Transaction transaction = transactionRepository.findByTransactionIdAndCreatedBy(transactionId, userId)
+                .orElseThrow(() -> {
+                    log.error("[TRANSACTION-SERVICE] Failed to find transaction with ID: {} for User ID: {}", transactionId, userId);
+                    return new ResourceNotFoundException("Transaction not found");
+                });
+
+        return TransactionMapper.toHistoryItemResponse(transaction);
+    }
 
 
     @Override
@@ -102,6 +151,7 @@ public class TransactionServiceImpl implements TransactionService {
             if (cause instanceof ResourceNotFoundException ex) throw ex;
             if (cause instanceof UnauthorizedException ex) throw ex;
             if (cause instanceof ValidationException ex) throw ex;
+            if (cause instanceof AccountClosedException ex) throw ex;
             throw new TransactionFailedException(
                     "Failed to fetch account details: " + cause.getMessage(), cause);
         }
@@ -361,12 +411,8 @@ public class TransactionServiceImpl implements TransactionService {
                     sourceAccountId, userId);
             throw new UnauthorizedException("Unauthorized access attempt");
         }
-        if(senderClient.getStatus() == AccountClientResponse.AccountStatus.CLOSED){
-            log.error("[TRANSACTION-SERVICE] Account ID: {} is closed", sourceAccountId);
-            throw new ValidationException("Your account is closed. Please contact support for assistance");
-        }
-        if(amount
-                .compareTo(senderClient.getAvailableBalance()) > 0){
+
+        if(amount.compareTo(senderClient.getAvailableBalance()) > 0){
             log.error("[TRANSACTION-SERVICE] Insufficient funds in source account ID: {}",
                     sourceAccountId);
             throw new ValidationException("Insufficient funds in source account");
@@ -383,12 +429,17 @@ public class TransactionServiceImpl implements TransactionService {
     }
 
     private void validateReceiverAccount(AccountClientResponse receiverClient, Currency senderCurrency) {
-        if(receiverClient.getStatus() == AccountClientResponse.AccountStatus.CLOSED){
-            log.error("[TRANSACTION-SERVICE] Receiver Account ID: {} is closed", receiverClient.getAccountId());
-            throw new ValidationException("Receiver account is closed.");
-        }
         if (senderCurrency != receiverClient.getCurrency()) {
             throw new ValidationException("Source and destination accounts must use the same currency");
+        }
+    }
+
+    private void validateTransactionId(String transactionId) {
+        String[] splitTransaction = transactionId.trim().split("-");
+        if(splitTransaction.length != 3 ||
+                !splitTransaction[0].equalsIgnoreCase("TXN") ||
+                splitTransaction[1].length() != 8 || splitTransaction[2].length() != 12){
+            throw new ValidationException("Invalid transaction ID format");
         }
     }
 }
