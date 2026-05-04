@@ -15,12 +15,12 @@ import java.util.Set;
         name = "users",
         indexes = {
                 @Index(name = "idx_email", columnList = "email"),
-                @Index(name = "idx_phone_numer", columnList = "phoneNumber"),
+                @Index(name = "idx_phone_number", columnList = "phone_number"),
                 @Index(name = "idx_account_status", columnList = "account_status")
         },
         uniqueConstraints = {
         @UniqueConstraint(name = "uk_email", columnNames = "email"),
-        @UniqueConstraint(name = "uk_phone_number", columnNames = "phoneNumber")
+        @UniqueConstraint(name = "uk_phone_number", columnNames = "phone_number")
 })
 @Getter
 @Setter
@@ -39,50 +39,55 @@ public class User {
     @Column(nullable = false)
     private String password; // Bcrypt hashed
 
-    @Column(nullable = false, length = 50)
+    @Column(name = "first_name", nullable = false, length = 50)
     private String firstName;
 
-    @Column(length = 50)
+    @Column(name = "last_name", length = 50)
     private String lastName;
 
-    @Column(unique = true, length = 100)
+    @Column(name = "phone_number", unique = true, length = 100)
     private String phoneNumber; // E.164 format: +1234567890
 
-    @Column(nullable = false)
+    @Column(name = "email_verified", nullable = false)
     private Boolean emailVerified = false;
 
-    @Column(nullable = false)
+    @Column(name = "phone_verified", nullable = false)
     private Boolean phoneVerified = false;
 
     @Enumerated(EnumType.STRING)
-    @Column(nullable = false, length = 20)
+    @Column(name = "account_status", nullable = false, length = 20)
     private AccountStatus accountStatus = AccountStatus.PENDING_VERIFICATION;
 
-    @Column(nullable = false)
+    @Column(name = "account_locked", nullable = false)
     private Boolean accountLocked = false; // the field only checks whether the User is able to login or not
 
-    @Column
+    @Column(name = "account_locked_until")
     private LocalDateTime accountLockedUntil; // used when many password attempts are made
 
-    @Column(nullable = false)
+    @Column(name = "failed_login_attempts", nullable = false)
     private Integer failedLoginAttempts = 0;
 
-    @Column
+    @Column(name = "last_login_at")
     private LocalDateTime lastLoginAt;
 
-    @Column(length = 45)
+    @Column(name = "last_login_ip", length = 45)
     private String lastLoginIp;
 
-    @Column
+    @Column(name = "password_changed_at")
     private LocalDateTime passwordChangedAt;
 
     @CreationTimestamp
-    @Column(nullable = false, updatable = false)
+    @Column(name = "created_at", nullable = false, updatable = false)
     private LocalDateTime createdAt;
 
     // ============= RELATIONSHIPS =============
     // Many-to-Many relationship with Role
     @ManyToMany(fetch = FetchType.EAGER, cascade = {CascadeType.PERSIST, CascadeType.MERGE})
+    @JoinTable(
+            name = "users_roles",
+            joinColumns = @JoinColumn(name = "user_id"),
+            inverseJoinColumns = @JoinColumn(name = "roles_id")
+    )
     @Builder.Default
     private Set<Role> roles = new HashSet<>();
 

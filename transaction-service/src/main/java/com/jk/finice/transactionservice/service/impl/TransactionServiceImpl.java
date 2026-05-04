@@ -69,10 +69,11 @@ public class TransactionServiceImpl implements TransactionService {
         String sortBy = filterRequest.getSortBy();
 
         // Setup the filter and pagination
-        Sort sort = sortDirection.equalsIgnoreCase("asc") ? Sort.by(sortBy).ascending() : Sort.by(sortBy).descending();
+        Sort sort = sortDirection.equalsIgnoreCase("asc")
+                ? Sort.by(sortBy).ascending()
+                : Sort.by(sortBy).descending();
         Pageable pageable = PageRequest.of(page, size, sort);
-        Specification<Transaction> spec = TransactionSpecification
-                .buildFilter(userId, filterRequest);
+        Specification<Transaction> spec = TransactionSpecification.buildFilter(userId, filterRequest);
 
         // Fetch the transactions
         Page<Transaction> pagedTransactions = transactionRepository.findAll(spec, pageable);

@@ -93,7 +93,7 @@ public class Transaction {
     private String receiverName;
 
     @Enumerated(EnumType.STRING)
-    @Column(name = "transfer_scope", length = 10)
+    @Column(name = "transfer_scope", length = 10) // For Deposit & Withdrawal we keep it NULL
     private TransferScope transferScope;
 
     // ============ Money Details ============

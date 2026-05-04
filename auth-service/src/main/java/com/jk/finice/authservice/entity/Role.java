@@ -39,7 +39,7 @@ public class Role {
     private Set<User> users = new HashSet<>();
 
     @CreationTimestamp
-    @Column(nullable = false, updatable = false)
+    @Column(name = "created_at", nullable = false, updatable = false)
     private LocalDateTime createdAt;
 
     // Constructor for easy role creation
